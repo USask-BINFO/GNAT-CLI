@@ -1,0 +1,240 @@
+#! /usr/bin/env bash
+
+# Run main.sh -h for help
+
+# Before running, add directory containing acr_aca_vis scripts to path
+# Also add scripts/clinker to path
+
+# Necessary arguments:
+# query_directory; database
+
+# Optional arguments:
+# master_file_location; PID_threshold; length_threshold; num_flanking_genes; evalue; num_iterations; scripts
+
+
+# Parse command-line arguments
+# Make sure some arguments were provided
+if [[ $# -lt 1 ]]; then
+  echo "No arguments provided, call main.sh -h or main.sh --help for help."
+  exit 1
+fi
+
+# Assign default values to arguments in case they aren't provided
+evalue=0.01
+num_iter=4
+num_flanking_genes=20
+pid_threshold=30
+length_threshold=0.20
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -q|--query_directory)
+      query_directory="$2"
+      shift
+      shift
+      ;;
+    -d|--database)
+      database="$2"
+      shift
+      shift
+      ;;
+    -h|--help)
+      echo "      Main script to generate phylogenetic trees and pie charts, genomic neighbourhoods, and clinker plots of"
+      echo "      psi-BLAST matches to the specified query/queries."
+      echo "Required Arguments:"
+      echo '  [-d][--database]                Path to database to query against.'
+      echo '  [-g][--gbff]                    GBFF directory.'
+      echo '  [-q][--query_directory]         Path to directory containing protein fasta queries.'
+      echo "Potentially Required Arguments:"
+      echo '  [-s][--scripts]                 Directory containing acrvis scripts, if they were not added to PATH. If not'
+      echo '                                    provided, assumes that scripts have been added to PATH.'
+      echo "Optional Arguments:"
+      echo '  [-e][--evalue]                  E-value for psi-BLAST search. Default=0.01'
+      echo '  [-h][--help]                    Prints this message.'
+      echo '  [-i][--num_iter]                Number of psi-BLAST iterations. Default=4'
+      echo '  [-l][--length_threshold]        Length threshold for match filtering. Filters out match genomic neighbourhoods'
+      echo '                                    that are outside of +-length_threshold*query_length. Default=0.20'
+      echo '  [-m][--master_file_location]    Location of master match file containing query names, protein match accessions,'
+      echo '                                   and e-values of the matches. Generated/updated by parse_psiblast_out.py. If'
+      echo '                                   not specified, creates a new all_match_names.txt in acrvis folder.'
+      echo '  [-n][--num_flanking_genes]      Number of genes to include upstream/downstream of match gene. Default=20'
+      echo '  [-p][--pid_threshold]           PID threshold for match filtering. Filters out match genomic neighbourhoods'
+      echo '                                    as "potentially homologous" that are less than pid_threshold identical.'
+      echo '                                    Default=30'
+      exit 0
+      ;;
+    -g|--gbff)
+      gbff="$2"
+      shift
+      shift
+      ;;
+    -e|--evalue)
+      evalue="$2"
+      shift
+      shift
+      ;;
+    -i|--num_iter)
+      num_iter="$2"
+      shift
+      shift
+      ;;
+    -n|--num_flanking_genes)
+      num_flanking_genes="$2"
+      shift
+      shift
+      ;;
+    -m|--master_file_location)
+      master_file_location="$2"
+      shift
+      shift
+      ;;
+    -p|--pid_threshold)
+      pid_threshold="$2"
+      shift
+      shift
+      ;;
+    -l|--length_threshold)
+      length_threshold="$2"
+      shift
+      shift
+      ;;
+    -s|--scripts)
+      script_dir="$2"
+      shift
+      shift
+      ;;
+    -*)
+      echo "Unknown option $1"
+      exit 1
+      ;;
+    *)
+      echo "Argument not associated with a flag: $1"
+      exit 1
+      ;;
+  esac
+done
+
+# Check that required arguments were provided
+if [ -z ${query_directory+x} ]; then
+  echo "Required argument [-q][--query_directory] not specified."
+  exit 1
+fi
+if [ -z ${database+x} ]; then
+  echo "Required argument [-d][--database] not specified."
+  exit 1
+fi
+if [ -z ${gbff+x} ]; then
+  echo "Required argument [-g][--gbff] not specified."
+  exit 1
+fi
+
+
+# Check if scripts were specified, if not, assume in PATH
+curr_dir=$(pwd)
+if [ -z ${script_dir+x} ]; then
+  echo "[-s][--scripts] not specified. Assuming scripts have been added to PATH."
+  script_dir=""
+else
+  script_dir=$(cd "$script_dir" || exit; pwd; cd "$curr_dir" || exit;)
+  script_dir="$script_dir/"
+fi
+
+# Make sure paths are absolute
+database=$(cd "$database" || exit; pwd; cd "$curr_dir" || exit)
+query_directory=$(cd "$query_directory" || exit; pwd; cd "$curr_dir" || exit)
+gbff=$(cd "$gbff" || exit; pwd; cd "$curr_dir" || exit)
+
+echo "Starting..."
+
+# Run scripts
+mkdir acrvis_out_$$
+cd acrvis_out_$$ || exit 1
+
+mkdir psiblast_out
+mkdir parsed_outs
+cd psiblast_out || exit 1
+
+echo "Running Psi-BLASTs"
+"${script_dir}"run_psiblasts.sh "$database" "$query_directory" "$evalue" "$num_iter"
+
+cd ..
+
+# Create and assign master_file_location if not specified
+if [ -z ${master_file_location+x} ];
+then
+  touch all_match_names.txt
+  master_file_location="$PWD/all_match_names.txt"
+fi
+
+echo "Using $master_file_location as master gene labelling file."
+
+# Get relevant info from psiblast output (PID, qsize, ssize, qname, gbffname)
+# Also updates the master file with new match data
+for file in "$PWD"/psiblast_out/*.all.out
+do
+  "${script_dir}"parse_psiblast_out.py "$file" -m "$master_file_location" > parsed_outs/"$(basename "$file")".parsed
+done
+
+
+mkdir data
+# Create a subdirectory for each query
+for query in parsed_outs/*.parsed
+do
+        mkdir data/"$(basename "$query")"
+done
+
+for file in parsed_outs/*.parsed
+do
+  "${script_dir}"build_gn.py "$file" -d "$gbff" -o "data/$(basename "$file")/" -n "$num_flanking_genes"
+done
+
+# Filter GNs based on size, PID, redundancy, kmer. Generate phylo data for each filtering step
+for dir in data/*
+do
+  # TODO: rewrite phylo script
+  # TODO Raw Phylo Data
+
+  # Remove redundants based on aa-seq
+  "${script_dir}"redundancy.py "$dir"
+  # TODO Non-Redundant Phylo Data
+
+  # Copy all GNs into new non-redundants directory
+  mkdir "$dir"/all_non_redundants
+  cp "$dir"/*.gb "$dir"/all_non_redundants
+  # Run clustering on NR directory
+  "${script_dir}"find_clusters.py "$dir"/all_non_redundants "$(basename "$dir" | cut -f1 -d ".")"
+  # Run plotting on NR clusters
+  if [[ $(ls "$dir"/all_non_redundants | wc -l) -gt 0 ]]; then
+      for cluster_dir in "$dir"/all_non_redundants/*_cluster_*
+        do
+        # TODO Cluster Phylo Data
+          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html
+        done
+  fi
+
+  # Split GNs into two directories based on PID (threshold = 30%)
+  "${script_dir}"pid_filter.py parsed_outs/"$(basename "$dir")" -f "$dir" -t "$pid_threshold"
+  for h in "$dir"/*homologous
+  do
+    # TODO PID Phylo Data
+    # Split GNs into two directories based on size (within/outside 20% (default) query protein length)
+    "${script_dir}"size_filter.py parsed_outs/"$(basename "$dir")" -f "$h" -t "$length_threshold"
+    for s in "$h"/*size
+    do
+      # TODO Size Phylo Data
+      # Generate kmer clusters (second argument is for first part of cluster dir name)
+      "${script_dir}"find_clusters.py "$s" "$(basename "$dir" | cut -f1 -d ".")"
+      if [[ $(ls "$s" | wc -l) -gt 0 ]]; then
+      for cluster_dir in "$s"/*_cluster_*
+        do
+        # TODO Cluster Phylo Data
+          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html
+        done
+      fi
+    done
+  done
+done
+
+echo "Output to acrvis_out_$$"
+
