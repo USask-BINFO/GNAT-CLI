@@ -3,7 +3,7 @@
 Class to generate GN clusters based on kmer features in GN nucleotide sequences.
 """
 import copy
-from os import listdir, path, getcwd, mkdir
+from os import listdir, path, mkdir#, getcwd
 from Bio import SeqIO
 import numpy
 from sklearn.cluster import KMeans
@@ -281,7 +281,7 @@ class Cluster:
         num_clusters = len(self.matrix)//n
         if num_clusters <= 1:
             num_clusters = 2
-        print(num_clusters)
+        #print(num_clusters)
         clusters = self.kmeans(self.matrix, num_clusters)
 
         small, good, large = self.evaluate_clusters(clusters, min_thresh, max_thresh)
@@ -353,7 +353,7 @@ def main():
         clusters = c.sized_clusters(min_thresh=args.min_thresh, max_thresh=args.max_thresh, desired_size=args.cluster_size)
 
     # Make cluster directories and move GNs into their respective cluster directories
-    print("Current dir: %s" % getcwd())
+    #print("Current dir: %s" % getcwd())
     dir_header = args.out_name
     if args.out_dir:
         outdir = args.out_dir
