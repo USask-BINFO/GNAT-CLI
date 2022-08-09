@@ -90,3 +90,6 @@ For open source projects, say how it is licensed.
 
 ## Project status
 If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+
+## Temp Notes
+If getting AttributeError: 'NoneType' object has no attribute 'split' when running find_clusters.py, mentioning 'threadpoolctl.py', try running pip install threadpoolctl.py -U to update the package. The error doesn't prevent the pipeline from running correctly, but clutters output.
