@@ -75,8 +75,15 @@ for (let c in data.clusters) {
     let newName = "";
 
     for (let n in clusterName) {
-      if (n < clusterName.length - 2)
+      if (n < clusterName.length - 3) {
         newName += clusterName[n] + " ";
+      } else if (n == clusterName.length - 3) {
+        if (clusterName[n] == 1) {
+          newName += "(" + clusterName[n] + " duplicate)"
+        } else {
+          newName += "(" + clusterName[n] + " duplicates)"
+        }
+      }
     }
     data.clusters[c].name = newName;
 
