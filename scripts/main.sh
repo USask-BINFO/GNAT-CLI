@@ -9,7 +9,7 @@
 # query_directory; database
 
 # Optional arguments:
-# master_file_location; PID_threshold; length_threshold; num_flanking_genes; evalue; num_iterations; scripts
+# label_file_location; PID_threshold; length_threshold; num_flanking_genes; evalue; num_iterations; scripts
 
 # Parse command-line arguments
 # Make sure some arguments were provided
@@ -83,8 +83,8 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
-    -m|--master_file_location)
-      master_file_location="$2"
+    -lf|--label_file_location)
+      label_file_location="$2"
       shift
       shift
       ;;
@@ -159,20 +159,20 @@ echo "Running Psi-BLASTs"
 
 cd ..
 
-# Create and assign master_file_location if not specified
-if [ -z ${master_file_location+x} ];
+# Create and assign label_file_location if not specified
+if [ -z ${label_file_location+x} ];
 then
   touch all_match_names.txt
-  master_file_location="$PWD/all_match_names.txt"
+  label_file_location="$PWD/all_match_names.txt"
 fi
 
-echo "Using $master_file_location as master gene labelling file."
+echo "Using $label_file_location as match gene labelling file."
 
 # Get relevant info from psiblast output (PID, qsize, ssize, qname, gbffname)
-# Also updates the master file with new match data
+# Also updates the label file with new match data
 for file in "$PWD"/psiblast_out/*.all.out
 do
-  "${script_dir}"parse_psiblast_out.py "$file" -m "$master_file_location" > parsed_outs/"$(basename "$file")".parsed
+  "${script_dir}"parse_psiblast_out.py "$file" -m "$label_file_location" > parsed_outs/"$(basename "$file")".parsed
 done
 
 
@@ -208,7 +208,7 @@ do
       for cluster_dir in "$dir"/all_non_redundants/*_cluster_*
         do
         # TODO Cluster Phylo Data
-          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$master_file_location"
+          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location"
         done
   fi
 
@@ -228,7 +228,7 @@ do
       for cluster_dir in "$s"/*_cluster_*
         do
         # TODO Cluster Phylo Data
-          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$master_file_location"
+          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location"
         done
       fi
     done
