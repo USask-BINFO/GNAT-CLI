@@ -29,7 +29,8 @@ GBK_SUFFIXES = (".gbk", ".gb", ".genbank", ".gbf", ".gbff")
 GFF_SUFFIXES = (".gtf", ".gff", ".gff3")
 
 MASTER_FILE_DIRECTORY = "/birl2/data/Acr/clean/scripts/clinker/"
-
+labelfilelocation = [None]
+#print(labelfilelocation)
 
 def find_fasta(gff_path):
     path = None
@@ -482,6 +483,8 @@ class Gene(Serializer):
         self.translation = translation
 
         try:
+            #print(labelfilelocation)
+
             f = open(MASTER_FILE_DIRECTORY+"all_match_names.txt", "r")
             match_names = [line.rstrip().split() for line in f]
             match_dict = {}
