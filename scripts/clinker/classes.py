@@ -28,7 +28,6 @@ FASTA_SUFFIXES = (".fa", ".fsa", ".fna", ".fasta", ".faa")
 GBK_SUFFIXES = (".gbk", ".gb", ".genbank", ".gbf", ".gbff")
 GFF_SUFFIXES = (".gtf", ".gff", ".gff3")
 
-MASTER_FILE_DIRECTORY = "/birl2/data/Acr/clean/scripts/clinker/"
 labelfilelocation = [None]
 #print(labelfilelocation)
 
@@ -484,29 +483,32 @@ class Gene(Serializer):
 
         try:
             #print(labelfilelocation)
+            lf = labelfilelocation[0]
+            if lf == "":
+                pass
+            else:
+                f = open(lf, "r")
+                match_names = [line.rstrip().split() for line in f]
+                match_dict = {}
+                for pair in match_names:
+                    match_dict[pair[0]] = (pair[1], pair[2])
+                f.close()
+                # query = match_names[0]
 
-            f = open(MASTER_FILE_DIRECTORY+"all_match_names.txt", "r")
-            match_names = [line.rstrip().split() for line in f]
-            match_dict = {}
-            for pair in match_names:
-                match_dict[pair[0]] = (pair[1], pair[2])
-            f.close()
-            # query = match_names[0]
-
-            if names:
-                self.names["psi_blast_match"] = None
-                self.names["match_short"] = None
-                if "protein_id" in self.names:
-                    if self.names["protein_id"] in match_dict.keys():
-                        self.names["psi_blast_match"] = self.names["protein_id"] + ' (' + match_dict[
-                            self.names["protein_id"]][0] + ', ' + match_dict[self.names["protein_id"]][1] + ')'
-                        self.names["match_short"] = match_dict[self.names["protein_id"]][0] + " (" + match_dict[self.names["protein_id"]][1] + ")"
+                if names:
+                    self.names["psi_blast_match"] = None
+                    self.names["match_short"] = None
+                    if "protein_id" in self.names:
+                        if self.names["protein_id"] in match_dict.keys():
+                            self.names["psi_blast_match"] = self.names["protein_id"] + ' (' + match_dict[
+                                self.names["protein_id"]][0] + ', ' + match_dict[self.names["protein_id"]][1] + ')'
+                            self.names["match_short"] = match_dict[self.names["protein_id"]][0] + " (" + match_dict[self.names["protein_id"]][1] + ")"
+                        else:
+                            self.names["psi_blast_match"] = None
+                            self.names["match_short"] = None
                     else:
                         self.names["psi_blast_match"] = None
                         self.names["match_short"] = None
-                else:
-                    self.names["psi_blast_match"] = None
-                    self.names["match_short"] = None
 
         except FileNotFoundError:
             LOG.info("all_match_names.txt does not exist in this directory. gene['names']['psi_blast_match'] will "
@@ -571,4 +573,5 @@ class Gene(Serializer):
             end=end if end else int(feature.location.end),
             strand=feature.location.strand,
         )
+
 
