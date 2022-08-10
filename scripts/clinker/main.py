@@ -13,6 +13,7 @@ import csv
 from pathlib import Path
 from collections import defaultdict
 from typing import TextIO, Dict, List
+from os import path as osPath
 
 #from clinker import __version__, align
 #from clinker.plot import plot_clusters, plot_data
@@ -327,6 +328,15 @@ def main():
     args = parser.parse_args()
     
     labelfilelocation[0] = args.labelling_file
+    lf = args.labelling_file
+    if lf == "":
+        LOG.info("No labelling file provided. Psi-BLAST matches will not be labelled.")
+    else:
+        if not osPath.isfile(lf):
+            LOG.warn("Warning: '%s' is not recognized as a file. Psi-BLAST matches will not be labelled." % lf)
+            labelfilelocation[0] = ""
+        else:
+            LOG.info("Using '%s' as psi-BlAST labelling file." % lf)
 
     clinker(
         args.files,
@@ -350,4 +360,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
