@@ -11,6 +11,11 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
+    -lf)
+      LABELFILE="$2"
+      shift
+      shift
+      ;;
     *)
       if [[ "$1" == *".gb" ]]; then
         POSITIONAL_ARGS+=("$1")
@@ -32,4 +37,5 @@ if [[ ${#POSITIONAL_ARGS[@]} -lt 1 ]]; then
   exit 1
 fi
 
-python "$(echo "${BASH_SOURCE[0]}" | rev | cut -d'/' -f2- | rev)"/clinker/main.py "${POSITIONAL_ARGS[@]}" -p "$PLOTNAME"
+python "$(echo "${BASH_SOURCE[0]}" | rev | cut -d'/' -f2- | rev)"/clinker/main.py "${POSITIONAL_ARGS[@]}" -p "$PLOTNAME" -lf "$LABELFILE"
+

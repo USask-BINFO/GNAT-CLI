@@ -54,7 +54,7 @@ while [[ $# -gt 0 ]]; do
       echo '  [-i][--num_iter]                Number of psi-BLAST iterations. Default=4'
       echo '  [-l][--length_threshold]        Length threshold for match filtering. Filters out match genomic neighbourhoods'
       echo '                                    that are outside of +-length_threshold*query_length. Default=0.20'
-      echo '  [-m][--master_file_location]    Location of master match file containing query names, protein match accessions,'
+      echo '  [-lf][--label_file_location]    Location of label match file containing query names, protein match accessions,'
       echo '                                   and e-values of the matches. Generated/updated by parse_psiblast_out.py. If'
       echo '                                   not specified, creates a new all_match_names.txt in acrvis folder.'
       echo '  [-n][--num_flanking_genes]      Number of genes to include upstream/downstream of match gene. Default=20'
@@ -208,7 +208,7 @@ do
       for cluster_dir in "$dir"/all_non_redundants/*_cluster_*
         do
         # TODO Cluster Phylo Data
-          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html
+          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$master_file_location"
         done
   fi
 
@@ -228,7 +228,7 @@ do
       for cluster_dir in "$s"/*_cluster_*
         do
         # TODO Cluster Phylo Data
-          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html
+          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$master_file_location"
         done
       fi
     done
@@ -236,4 +236,5 @@ do
 done
 
 echo "Output to acrvis_out_$$"
+
 
