@@ -145,7 +145,7 @@ for each in range(len(genomes)):
     print("%i GNs generated. Total=%s" % (each+1, str(len(genomes))))
 
     if len(genbankfile_matchname) > 150:
-        genbankfile_matchname = genbankfile_matchname[:138] + "_nametrimmed"
+        genbankfile_matchname = genbankfile_matchname[:137] + "_trimmed_name"
 
     # Write GN to args.out
     SeqIO.write(Gene_cluster, path.join(args.out, genbankfile_matchname.replace('/', '_') + '_' + str(accessions[each])
