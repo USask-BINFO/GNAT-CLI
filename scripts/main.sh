@@ -26,6 +26,7 @@ pid_threshold=30
 length_threshold=0.20
 out_location=$(pwd)
 out_tag=$(date +%j%M%H%S)
+tax_flag="o"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -61,10 +62,15 @@ while [[ $# -gt 0 ]]; do
       echo '                                   not specified, creates a new all_match_names.txt in acrvis folder.'
       echo '  [-n][--num_flanking_genes]      Number of genes to include upstream/downstream of match gene. Default=20'
       echo '  [-ol][--out_location]           Location to create output directory in. Defaults to the current directory'
-      echo '  [-ot][--out_tag]                Descriptor in output directory name. Defaults to the current time in ms.'
+      echo '  [-ot][--out_tag]                Descriptor in output directory name. Defaults to a string of 9 numbers. The '
+      echo '                                    first three are the current day (001-365), and the next six are HHMMSS.'
       echo '  [-p][--pid_threshold]           PID threshold for match filtering. Filters out match genomic neighbourhoods'
       echo '                                    as "potentially homologous" that are less than pid_threshold identical.'
       echo '                                    Default=30'
+      echo '  [-tf][--tax_flag]               Only use this flag if the database being queried is the ncbi bacterial '
+      echo '                                    database. If specified, will try to generate phylogenetic trees and pie '
+      echo '                                    charts, which may crash the program if any other dataset is used. Outputs '
+      echo '                                    a csv file containing the taxonomic data of matches in both cases.'
       exit 0
       ;;
     -g|--gbff)
@@ -110,6 +116,10 @@ while [[ $# -gt 0 ]]; do
     -ol|--out_location)
       out_location="$2"
       shift
+      shift
+      ;;
+    -tf|--tax_flag)
+      tax_flag="b"
       shift
       ;;
     -ot|--out_tag)
