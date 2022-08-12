@@ -179,7 +179,6 @@ if [ -d "$outdir" ]; then
 fi
 mkdir "$outdir"
 cd "$outdir" || exit 1
-exit 0
 mkdir psiblast_out
 mkdir parsed_outs
 cd psiblast_out || exit 1
