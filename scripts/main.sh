@@ -24,6 +24,8 @@ num_iter=4
 num_flanking_genes=20
 pid_threshold=30
 length_threshold=0.20
+out_location=$(pwd)
+out_tag=$(date +%j%M%H%S)
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -58,6 +60,8 @@ while [[ $# -gt 0 ]]; do
       echo '                                   and e-values of the matches. Generated/updated by parse_psiblast_out.py. If'
       echo '                                   not specified, creates a new all_match_names.txt in acrvis folder.'
       echo '  [-n][--num_flanking_genes]      Number of genes to include upstream/downstream of match gene. Default=20'
+      echo '  [-ol][--out_location]           Location to create output directory in. Defaults to the current directory'
+      echo '  [-ot][--out_tag]                Descriptor in output directory name. Defaults to the current time in ms.'
       echo '  [-p][--pid_threshold]           PID threshold for match filtering. Filters out match genomic neighbourhoods'
       echo '                                    as "potentially homologous" that are less than pid_threshold identical.'
       echo '                                    Default=30'
@@ -103,6 +107,16 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
+    -ol|--out_location)
+      out_location="$2"
+      shift
+      shift
+      ;;
+    -ot|--out_tag)
+      out_tag="$2"
+      shift
+      shift
+      ;;
     -*)
       echo "Unknown option $1"
       exit 1
@@ -143,13 +157,19 @@ fi
 database=$(cd "$database" || exit; pwd; cd "$curr_dir" || exit)
 query_directory=$(cd "$query_directory" || exit; pwd; cd "$curr_dir" || exit)
 gbff=$(cd "$gbff" || exit; pwd; cd "$curr_dir" || exit)
+out_location=$(cd "$out_location" || exit; pwd; cd "$curr_dir" || exit)
 
 echo "Starting..."
 
 # Run scripts
-mkdir acrvis_out_$$
-cd acrvis_out_$$ || exit 1
-
+outdir="$out_location"/acrvis_out_"$out_tag"
+if [ -d "$outdir" ]; then
+  echo "Error: directory $outdir exists. Specify a different -ot or -ol. Exiting...";
+  exit 1;
+fi
+mkdir "$outdir"
+cd "$outdir" || exit 1
+exit 0
 mkdir psiblast_out
 mkdir parsed_outs
 cd psiblast_out || exit 1
@@ -235,6 +255,6 @@ do
   done
 done
 
-echo "Output to acrvis_out_$$"
+echo "Output to $outdir"
 
 
