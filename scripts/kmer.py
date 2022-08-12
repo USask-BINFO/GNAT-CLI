@@ -8,8 +8,8 @@ class kmer_featurization:
     k: the "k" in k-mer
     """
     self.k = k
-    #self.letters = ['A', 'T', 'C', 'G', 'N', 'M', 'K', 'S', 'Y', 'W', 'R', 'B', 'D', 'H', 'V']
-    self.letters = ['A', 'T', 'C', 'G', 'N', 'M', 'Y', 'R', 'W', 'K', 'S']
+    self.letters = ['A', 'T', 'C', 'G', 'N', 'M', 'K', 'S', 'Y', 'W', 'R', 'B', 'D', 'H', 'V', 'U']
+    #self.letters = ['A', 'T', 'C', 'G', 'N', 'M', 'Y', 'R', 'W', 'K', 'S']
     self.multiplyBy = len(self.letters) ** np.arange(k-1, -1, -1) # the multiplying number for each digit position in the k-number system
     self.n = len(self.letters)**k # number of possible k-mers
 
