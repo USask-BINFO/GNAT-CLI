@@ -209,7 +209,8 @@ mkdir data
 # Create a subdirectory for each query
 for query in parsed_outs/*.parsed
 do
-        mkdir data/"$(basename "$query")"
+  v=$(cat "$query" | wc -l)
+  if [[ "$v" -gt 0 ]] && mkdir data/"$(basename "$query")"
 done
 
 for file in parsed_outs/*.parsed
