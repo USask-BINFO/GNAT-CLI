@@ -45,16 +45,12 @@ for file in listdir(file_dir):
 spur_dir = path.join(out_dir, path.abspath(out_dir).split("/")[-1].split(".")[0]+"_potentially_homologous")
 non_spur_dir = path.join(out_dir, path.abspath(out_dir).split("/")[-1].split(".")[0]+"_homologous")
 
-mkdir(spur_dir)
-mkdir(non_spur_dir)
+if len(spur) > 0:
+    mkdir(spur_dir)
+    for file in spur:
+        move(path.join(file_dir, file), path.join(spur_dir, file))
 
-for file in spur:
-    #rename(path.join(file_dir, file), path.join(spur_dir, file))
-    #replace(path.join(file_dir, file), path.join(spur_dir, file))
-    move(path.join(file_dir, file), path.join(spur_dir, file))
-
-for file in non_spur:
-    #rename(path.join(file_dir, file), path.join(non_spur_dir, file))
-    #replace(path.join(file_dir, file), path.join(non_spur_dir, file))
-    move(path.join(file_dir, file), path.join(non_spur_dir, file))
-
+if len(non_spur_dir) > 0:
+    mkdir(non_spur_dir)
+    for file in non_spur:
+        move(path.join(file_dir, file), path.join(non_spur_dir, file))
