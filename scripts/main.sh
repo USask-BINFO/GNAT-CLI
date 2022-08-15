@@ -222,10 +222,12 @@ for dir in data/*
 do
   # TODO: rewrite phylo script
   # TODO Raw Phylo Data
+  "${script_dir}"generate_phylogeny_data.py "$dir" -n $(basename "$dir" | cut -f1 -d '.')_raw -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$dir"
 
   # Remove redundants based on aa-seq
   "${script_dir}"redundancy.py "$dir"
   # TODO Non-Redundant Phylo Data
+  "${script_dir}"generate_phylogeny_data.py "$dir" -n $(basename "$dir" | cut -f1 -d '.')_non-redundant -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$dir"
 
   # Copy all GNs into new non-redundants directory
   mkdir "$dir"/all_non_redundants
@@ -237,6 +239,7 @@ do
       for cluster_dir in "$dir"/all_non_redundants/*_cluster_*
         do
         # TODO Cluster Phylo Data
+          "${script_dir}"generate_phylogeny_data.py "$cluster_dir" -n $(basename "$cluster_dir") -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$cluster_dir"
           "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location"
         done
   fi
@@ -246,17 +249,20 @@ do
   for h in "$dir"/*homologous
   do
     # TODO PID Phylo Data
+    "${script_dir}"generate_phylogeny_data.py "$h" -n $(basename "$h") -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$h" 
     # Split GNs into two directories based on size (within/outside 20% (default) query protein length)
     "${script_dir}"size_filter.py parsed_outs/"$(basename "$dir")" -f "$h" -t "$length_threshold"
     for s in "$h"/*size
     do
       # TODO Size Phylo Data
+      "${script_dir}"generate_phylogeny_data.py "$s" -n $(basename "$s") -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$s"
       # Generate kmer clusters (second argument is for first part of cluster dir name)
       "${script_dir}"find_clusters.py "$s" "$(basename "$dir" | cut -f1 -d ".")"
       if [[ $(ls "$s" | wc -l) -gt 0 ]]; then
       for cluster_dir in "$s"/*_cluster_*
         do
-        # TODO Cluster Phylo Data
+          # TODO Cluster Phylo Data
+          "${script_dir}"generate_phylogeny_data.py "$cluster_dir" -n $(basename "$cluster_dir") -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$cluster_dir"
           "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location"
         done
       fi
