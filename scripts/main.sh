@@ -227,13 +227,13 @@ do
   # Remove redundants based on aa-seq
   "${script_dir}"redundancy.py "$dir"
   # TODO Non-Redundant Phylo Data
-  "${script_dir}"generate_phylogeny_data.py "$dir" -n $(basename "$dir" | cut -f1 -d '.')_non-redundant -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$dir"
+  "${script_dir}"generate_phylogeny_data.py "$dir" -n $(basename "$dir" | cut -f1 -d '.')_non_redundant -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$dir"
 
   # Copy all GNs into new non-redundants directory
   mkdir "$dir"/all_non_redundants
   cp "$dir"/*.gb "$dir"/all_non_redundants
   # Run clustering on NR directory
-  "${script_dir}"find_clusters.py "$dir"/all_non_redundants "$(basename "$dir" | cut -f1 -d ".")"
+  "${script_dir}"find_clusters.py "$dir"/all_non_redundants "$(basename "$dir" | cut -f1 -d ".")_non_redundant"
   # Run plotting on NR clusters
   if [[ $(ls "$dir"/all_non_redundants | wc -l) -gt 0 ]]; then
       for cluster_dir in "$dir"/all_non_redundants/*_cluster_*
@@ -257,7 +257,7 @@ do
       # TODO Size Phylo Data
       "${script_dir}"generate_phylogeny_data.py "$s" -n $(basename "$s") -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$s"
       # Generate kmer clusters (second argument is for first part of cluster dir name)
-      "${script_dir}"find_clusters.py "$s" "$(basename "$dir" | cut -f1 -d ".")"
+      "${script_dir}"find_clusters.py "$s" "$(basename "$s")"
       if [[ $(ls "$s" | wc -l) -gt 0 ]]; then
       for cluster_dir in "$s"/*_cluster_*
         do
