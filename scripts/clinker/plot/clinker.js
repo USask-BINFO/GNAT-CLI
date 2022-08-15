@@ -440,7 +440,7 @@ function plot(data) {
         short.textContent = "dynamic short"
 
         vshort.setAttribute("value", "dynamic_very_short")
-        vshort.textContent = "dynamic_very_short"
+        vshort.textContent = "dynamic very short"
 
         document.getElementById("select-label-type").appendChild(match)
         document.getElementById("select-label-type").appendChild(short)
