@@ -46,16 +46,11 @@ for file in listdir(file_dir):
 within_dir = path.join(out_dir, path.abspath(out_dir).split("/")[-1]+"_in_size")
 outside_dir = path.join(out_dir, path.abspath(out_dir).split("/")[-1]+"_out_size")
 
-mkdir(within_dir)
-mkdir(outside_dir)
-
-for file in within:
-    #rename(path.join(file_dir, file), path.join(spur_dir, file))
-    #replace(path.join(file_dir, file), path.join(spur_dir, file))
-    move(path.join(file_dir, file), path.join(within_dir, file))
-
-for file in outside:
-    #rename(path.join(file_dir, file), path.join(non_spur_dir, file))
-    #replace(path.join(file_dir, file), path.join(non_spur_dir, file))
-    move(path.join(file_dir, file), path.join(outside_dir, file))
-
+if len(within) > 0:
+    mkdir(within_dir)
+    for file in within:
+        move(path.join(file_dir, file), path.join(within_dir, file))
+if len(outside) > 0:
+    mkdir(outside_dir)
+    for file in outside:
+        move(path.join(file_dir, file), path.join(outside_dir, file))
