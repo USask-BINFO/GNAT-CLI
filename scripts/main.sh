@@ -210,7 +210,9 @@ mkdir data
 for query in parsed_outs/*.parsed
 do
   v=$(cat "$query" | wc -l)
-  if [[ "$v" -gt 0 ]] && mkdir data/"$(basename "$query")"
+  if [[ "$v" -gt 0 ]]; then
+    mkdir data/"$(basename "$query")";
+  fi
 done
 
 for file in parsed_outs/*.parsed
