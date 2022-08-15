@@ -498,27 +498,33 @@ class Gene(Serializer):
                 if names:
                     self.names["psi_blast_match"] = None
                     self.names["match_short"] = None
+                    self.names["match_very_short"] = None
                     if "protein_id" in self.names:
                         if self.names["protein_id"] in match_dict.keys():
                             self.names["psi_blast_match"] = self.names["protein_id"] + ' (' + match_dict[
                                 self.names["protein_id"]][0] + ', ' + match_dict[self.names["protein_id"]][1] + ')'
                             self.names["match_short"] = match_dict[self.names["protein_id"]][0] + " (" + match_dict[self.names["protein_id"]][1] + ")"
+                            self.names["match_very_short"] = match_dict[self.names["protein_id"]][0]
                         else:
                             self.names["psi_blast_match"] = None
                             self.names["match_short"] = None
+                            self.names["match_very_short"] = None
                     else:
                         self.names["psi_blast_match"] = None
                         self.names["match_short"] = None
+                        self.names["match_very_short"] = None
 
         except FileNotFoundError:
             LOG.info("all_match_names.txt does not exist in this directory. gene['names']['psi_blast_match'] will "
                      "always be false.")
             self.names["psi_blast_match"] = None
             self.names["match_short"] = None
+            self.names["match_very_short"] = None
         except Exception as e:
             LOG.info("Unknown exception occurred: %s." % e)
             self.names["psi_blast_match"] = None
             self.names["match_short"] = None
+            self.names["match_very_short"] = None
         self.names["clear"] = ' '
 
     def to_dict(self):

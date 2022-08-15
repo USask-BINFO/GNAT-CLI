@@ -298,6 +298,7 @@ function plot(data) {
   let labelTypes = new Set()
   labelTypes.add("psi_blast_match") // Add psi_blast_match here so that it's always on top of the dropdown list
   labelTypes.add("match_short")
+  labelTypes.add("match_very_short")
   data.clusters.forEach(cluster => {
     cluster.loci.forEach(locus => {
       locus.genes.forEach(gene => Object.keys(gene.names).forEach(type => labelTypes.add(type)))
