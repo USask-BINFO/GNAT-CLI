@@ -43,8 +43,8 @@ for file in listdir(file_dir):
         else:
             outside.append(file)
 
-within_dir = path.join(out_dir, "in_size")
-outside_dir = path.join(out_dir, "out_size")
+within_dir = path.join(out_dir, path.abspath(out_dir).split("/")[-1]+"_in_size")
+outside_dir = path.join(out_dir, path.abspath(out_dir).split("/")[-1]+"_out_size")
 
 mkdir(within_dir)
 mkdir(outside_dir)

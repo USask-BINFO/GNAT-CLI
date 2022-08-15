@@ -42,8 +42,8 @@ for file in listdir(file_dir):
         else:
             non_spur.append(file)
 
-spur_dir = path.join(out_dir, "potentially_homologous")
-non_spur_dir = path.join(out_dir, "homologous")
+spur_dir = path.join(out_dir, path.abspath(out_dir).split("/")[-1].split(".")[0]+"_potentially_homologous")
+non_spur_dir = path.join(out_dir, path.abspath(out_dir).split("/")[-1].split(".")[0]+"_homologous")
 
 mkdir(spur_dir)
 mkdir(non_spur_dir)
