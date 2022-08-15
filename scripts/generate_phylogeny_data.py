@@ -42,9 +42,12 @@ if args.data_type is not None:
 else:
     phylodir_name = "%s_phylogeny_data" % args.name
 
-if not path.isdir(path.join(outdir, phylodir_name)):
-    makedirs(path.join(outdir, phylodir_name))
-outlocation = path.join(outdir, phylodir_name)
+if args.data_type == "bacterial":
+    if not path.isdir(path.join(outdir, phylodir_name)):
+        makedirs(path.join(outdir, phylodir_name))
+    outlocation = path.join(outdir, phylodir_name)
+else:
+    outlocation = outdir
 
 # Check if a directory was provided, and get genome names
 genomes = []
