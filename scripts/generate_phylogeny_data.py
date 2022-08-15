@@ -20,13 +20,13 @@ environ["QT_QPA_PLATFORM"] = "offscreen"
 parser = argparse.ArgumentParser("Pull taxonomy data from a list of GNs and generate phylogenetic tree and pies.")
 parser.add_argument("GNs", nargs="+", help="Genomic neighbourhoods (or .gbff.gz files) to generate taxonomic data for. "
                                            "Can also just point to the directory containing the files of interest.")
-parser.add_argument("-n", "--name", help="Name of query or gbff source. E.g, AcrIF7, bacterialdb, Aca1", required=True)
+parser.add_argument("-n", "--name", help="Name of query or gbff source. E.g, AcrIF7, bacterialdb, Aca1. Required.", required=True)
 parser.add_argument("-o", "--out", help="Desired location of output. If not specified, outputs to current directory.")
 parser.add_argument("-m", "--mode", default="GN", help="Specify file type: GBFF if providing .gbff.gz files. Defaults "
                     "to GN.", choices=["GN", "GBFF"])
-parser.add_argument("-dt", "--data_type", help="Expected data source (bacteria or other) for generating phylogenetic "
-                    "data. Default=other. If bacteria, will generate phylogenetic trees and pie charts, else will "
-                    "output a csv containing the data.", choices=["bacteria", "other"], default="other")
+parser.add_argument("-dt", "--data_type", help="Expected data source (bacterial, fungal, viral, etc.) for generating " 
+                    "phylogenetic data. If 'bacterial', will generate phylogenetic trees and pie charts, else will "
+                    "only output a csv containing the data.")
 
 args = parser.parse_args()
 
@@ -79,6 +79,21 @@ for gn in genomes:
             count = count + 1
             tax_list.append(seq_record.annotations["taxonomy"])
             tax_list[-1].append(seq_record.annotations["organism"])
+
+taxstr = ""
+if args.data_type is not None:
+    outfilename = "%s_%s_taxonomy.csv" % (args.name, args.data_type)
+else:
+    outfilename = "%s_taxonomy.csv" % args.name
+for line in tax_list:
+    for i in range(len(line)):
+        line[i].replace(",", "_")
+    taxstr += ",".join(line) + "\n"
+with open(path.join(outdir, outfilename), "w") as f:
+    f.write(taxstr)
+
+if args.data_type != "bacterial":   # Exit here to prevent generation of phylo figures if datatype isn't bacterial
+    exit()
 
 
 # Parse lines to avoid crashes in the visualization step (and to make everything look nice)
