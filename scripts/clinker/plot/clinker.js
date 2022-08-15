@@ -427,9 +427,11 @@ function plot(data) {
 
         labelTypes.add("dynamic_match");
         labelTypes.add("dynamic_short");
+        labelTypes.add("dynamic_very_short");
 
         let match = document.createElement("option")
         let short = document.createElement("option")
+        let vshort = document.createElement("option")
 
         match.setAttribute("value", "dynamic_match");
         match.textContent = "dynamic match"
@@ -437,8 +439,12 @@ function plot(data) {
         short.setAttribute("value", "dynamic_short")
         short.textContent = "dynamic short"
 
+        vshort.setAttribute("value", "dynamic_very_short")
+        vshort.textContent = "dynamic_very_short"
+
         document.getElementById("select-label-type").appendChild(match)
         document.getElementById("select-label-type").appendChild(short)
+        document.getElementById("select-label-type").appendChild(vshort)
       }
 
       let fr = new FileReader();
@@ -461,11 +467,13 @@ function plot(data) {
                   const pId = gene.names["protein_id"]
                   gene.names["dynamic_match"] = pId + " (" + matchDict[pId][0] + ", " + matchDict[pId][1] + ")";
                   gene.names["dynamic_short"] = matchDict[pId][0] + " (" + matchDict[pId][1] + ")";
+                  gene.names["dynamic_very_short"] = matchDict[pId][0]
                 } else { flag = true }
               } else { flag = true }
               if (flag) {
                 gene.names["dynamic_match"] = "";
                 gene.names["dynamic_short"] = "";
+                gene.names["dynamic_very_short"] = "";
               }
             }
           }
