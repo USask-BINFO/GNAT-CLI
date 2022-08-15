@@ -37,9 +37,14 @@ else:
 if outdir[-1] != "/":
     outdir += "/"
 
-if not path.isdir(path.join(outdir, "phylogeny_data")):
-    makedirs(path.join(outdir, "phylogeny_data"))
-outlocation = path.join(outdir, "phylogeny_data")
+if args.data_type is not None:
+    phylodir_name = "%s_%s_phylogeny_data" % (args.name, args.data_type)
+else:
+    phylodir_name = "%s_phylogeny_data" % args.name
+
+if not path.isdir(path.join(outdir, phylodir_name)):
+    makedirs(path.join(outdir, phylodir_name))
+outlocation = path.join(outdir, phylodir_name)
 
 # Check if a directory was provided, and get genome names
 genomes = []
@@ -80,6 +85,8 @@ for gn in genomes:
             tax_list.append(seq_record.annotations["taxonomy"])
             tax_list[-1].append(seq_record.annotations["organism"])
 
+# ----------------------------------------------------------------------------------------------------------------------
+# Generate taxonomic data csv
 taxstr = ""
 if args.data_type is not None:
     outfilename = "%s_%s_taxonomy.csv" % (args.name, args.data_type)
@@ -89,7 +96,7 @@ for line in tax_list:
     for i in range(len(line)):
         line[i].replace(",", "_")
     taxstr += ",".join(line) + "\n"
-with open(path.join(outdir, outfilename), "w") as f:
+with open(path.join(outlocation, outfilename), "w") as f:
     f.write(taxstr)
 
 if args.data_type != "bacterial":   # Exit here to prevent generation of phylo figures if datatype isn't bacterial
