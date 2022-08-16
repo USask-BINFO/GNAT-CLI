@@ -151,15 +151,20 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+curr_dir=$(pwd)
 # Check that required arguments were provided
 if [ -z ${query_directory+x} ]; then
   if [ -z ${psiblast_out_directory+x} ]; then
     echo "Error: Must specify either [-q][--query_directory] or [-p][--psiblast_out_directory]."
     exit 1
+  else 
+    psiblast_out_directory=$(cd "$psiblast_out_directory" || exit; pwd; cd "$curr_dir" || exit;)
   fi
 else
   if [ ! -z ${psiblast_out_directory+x} ]; then
     echo "Error: Only one of [-q][--query_directory] and [-p][--psiblast_out_directory] may be specified."
+  else
+    query_directory=$(cd "$query_directory" || exit; pwd; cd "$curr_dir" || exit;)
   fi
 fi
 if [ -z ${database+x} ]; then
@@ -172,7 +177,6 @@ if [ -z ${gbff+x} ]; then
 fi
 
 # Check if scripts were specified, if not, assume in PATH
-curr_dir=$(pwd)
 if [ -z ${script_dir+x} ]; then
   echo "[-s][--scripts] not specified. Assuming scripts have been added to PATH."
   script_dir=""
@@ -183,7 +187,6 @@ fi
 
 # Make sure paths are absolute
 database=$(cd "$database" || exit; pwd; cd "$curr_dir" || exit)
-query_directory=$(cd "$query_directory" || exit; pwd; cd "$curr_dir" || exit)
 gbff=$(cd "$gbff" || exit; pwd; cd "$curr_dir" || exit)
 out_location=$(cd "$out_location" || exit; pwd; cd "$curr_dir" || exit)
 
@@ -207,7 +210,9 @@ if [ ! -z ${query_directory+x} ]; then
   "${script_dir}"run_psiblasts.sh "$database" "$query_directory" "$evalue" "$num_iter"
 else
   echo "Using Psi-BLAST outputs from $psiblast_out_directory"
-  cp "$psiblast_out_directory"/*.all.out "."
+  for file in $(ls "$psiblast_out_directory" | grep ".all.out"); do
+    cp "$psiblast_out_directory"/"$file" ".";
+  done
 fi
 cd ..
 
