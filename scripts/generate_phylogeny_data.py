@@ -67,7 +67,7 @@ else:
         genomes.append(g)
 
 # ----------------------------------------------------------------------------------------------------------------------
-# TODO: Parse taxonomy data
+# Parse taxonomy data
 
 count = 0
 tax_list = []
@@ -105,7 +105,8 @@ with open(path.join(outlocation, outfilename), "w") as f:
 if args.data_type != "bacterial":   # Exit here to prevent generation of phylo figures if datatype isn't bacterial
     exit()
 
-
+# ----------------------------------------------------------------------------------------------------------------------
+# Only 'bacterial' data_type onward
 # Parse lines to avoid crashes in the visualization step (and to make everything look nice)
 def remove_erroneous_chars(line):
     """
@@ -316,21 +317,3 @@ class TaxPie:
 
         """
         return
-
-# ----------------------------------------------------------------------------------------------------------------------
-# Output phylo data to csv
-outstr = ""
-for tax in tax_list:
-    line = ""
-    for t in remove_erroneous_chars(tax):
-        line += t + ","
-    line = line[:-1]
-    outstr += line + "\n"
-
-if args.name is not None:
-    tax_file_name = args.name
-else:
-    tax_file_name = "phylo_data"
-with open(path.join(outlocation, tax_file_name+".csv"), "w") as f:
-    f.write(outstr)
-print("Taxonomy csv written to %s" % path.join(outlocation, tax_file_name+".csv"))
