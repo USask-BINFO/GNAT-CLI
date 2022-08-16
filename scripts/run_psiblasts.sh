@@ -49,4 +49,5 @@ do
                 psiblast -query "$file" -db "$DBDIR/$db_name" -num_iterations "$NUM_ITER" -num_threads 4 -outfmt "6 qacc sacc pident qcovhsp length mismatch gapopen qstart qend sstart send qlen slen evalue"  -evalue "$EVAL" -out "$(basename "$file").out"
                 cat "$(basename "$file").out" | grep "$QUERY_NAME" >> "$(basename "$file")".all.out
         done < "$DBDIR"/all_pal_names.txt
+        rm -f "$(basename "$file")".out
 done
