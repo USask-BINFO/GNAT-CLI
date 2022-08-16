@@ -207,7 +207,7 @@ if [ ! -z ${query_directory+x} ]; then
   "${script_dir}"run_psiblasts.sh "$database" "$query_directory" "$evalue" "$num_iter"
 else
   echo "Using Psi-BLAST outputs from $psiblast_out_directory"
-  cp "$psiblast_out_directory/*.all.out" "."
+  cp "$psiblast_out_directory/"*.all.out "."
 fi
 cd ..
 
