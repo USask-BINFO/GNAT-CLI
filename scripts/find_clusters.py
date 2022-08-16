@@ -340,13 +340,19 @@ def main():
 
     if args.max_thresh <= 0 or args.min_thresh <= 0 or args.cluster_size <= 0:
         raise ValueError("[--max_thresh] (%i), [--min_thresh] (%i), and [-s][--cluster_size] (%i) must be positive.")
+    
+    rawdir = listdir(args.gn_dir)
+    gns_only = []
+    for item in rawdir:
+        if ".gb" in item:
+            gns_only.append(item)
 
-    if len(listdir(args.gn_dir)) < 1:
+    if len(gns_only) < 1:
         exit()
-    elif len(listdir(args.gn_dir)) <= args.min_thresh:
+    elif len(gns_only) <= args.min_thresh:
         clusters = []
         c = None
-        clusters.append(listdir(args.gn_dir))
+        clusters.append(gns_only)
     else:
         # Generate clusters
         c = Cluster(args.gn_dir, k=args.k)
