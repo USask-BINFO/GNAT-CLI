@@ -158,13 +158,13 @@ if [ -z ${query_directory+x} ]; then
     echo "Error: Must specify either [-q][--query_directory] or [-p][--psiblast_out_directory]."
     exit 1
   else 
-    psiblast_out_directory=$(cd "$psiblast_out_directory" || exit; pwd; cd "$curr_dir" || exit;)
+    query_directory=$(cd "$query_directory" || exit; pwd; cd "$curr_dir" || exit;)
   fi
 else
   if [ ! -z ${psiblast_out_directory+x} ]; then
     echo "Error: Only one of [-q][--query_directory] and [-p][--psiblast_out_directory] may be specified."
   else
-    query_directory=$(cd "$query_directory" || exit; pwd; cd "$curr_dir" || exit;)
+    psiblast_out_directory=$(cd "$psiblast_out_directory" || exit; pwd; cd "$curr_dir" || exit;)
   fi
 fi
 if [ -z ${database+x} ]; then
