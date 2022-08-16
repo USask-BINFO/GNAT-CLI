@@ -201,7 +201,7 @@ mkdir psiblast_out
 mkdir parsed_outs
 cd psiblast_out || exit 1
 
-if [ -z ${query_directory+x} ]; then
+if [ ! -z ${query_directory+x} ]; then
   # Run Psi-BLASTs
   echo "Running Psi-BLASTs"
   "${script_dir}"run_psiblasts.sh "$database" "$query_directory" "$evalue" "$num_iter"
