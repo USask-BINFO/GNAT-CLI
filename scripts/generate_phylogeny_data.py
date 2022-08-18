@@ -168,8 +168,6 @@ def parse_bacterial(line):
 bacterial = []
 wonky = []
 for tax in tax_list:
-    if "Tenericutes" in tax:
-        print(tax)
     try:
         bacterial.append(parse_bacterial(tax))
     except ValueError as e:
@@ -179,12 +177,13 @@ for tax in tax_list:
 treelist = bacterial
 pielist = []
 for line in bacterial:
-    while len(line) < 7:
-        line.append(line[-1])
-    if len(line) != 7:
-        raise ValueError("Error: line %s length %i != 7 after parsing." % (str(line), len(line)))
+    newline = line.copy()
+    while len(newline) < 7:
+        newline.append(newline[-1])
+    if len(newline) != 7:
+        raise ValueError("Error: line %s length %i != 7 after parsing." % (str(newline), len(newline)))
     else:
-        pielist.append(line)
+        pielist.append(newline)
 
 # ----------------------------------------------------------------------------------------------------------------------
 # TODO: Generate phylogenetic tree
