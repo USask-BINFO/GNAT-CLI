@@ -149,8 +149,8 @@ def parse_bacterial(line):
     for i in popable[::-1]:
         line.pop(i)
 
-    if len(line[-1]) > 2:
-        line[-1] = line[-1][:2]
+    if len(line[-1].split()) > 2:
+        line[-1] = " ".join(line[-1].split()[:2])
     return line
 
     """for i in range(len(line)):
