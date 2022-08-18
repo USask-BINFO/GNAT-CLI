@@ -151,8 +151,6 @@ def parse_bacterial(line):
 
     if len(line[-1].split()) > 2:
         line[-1] = " ".join(line[-1].split()[:2])
-    if line[1] == "Tenericutes":
-        print(line)
     return line
 
     """for i in range(len(line)):
@@ -277,7 +275,7 @@ class BasicTree:
 # Create the tree
 italics = [[]]
 trees = []
-for bac_line in bacterial:
+for bac_line in treelist:
     for item_index in range(len(bac_line)):
         item = bac_line[item_index]
 
@@ -302,7 +300,7 @@ for bac_line in bacterial:
                 if res is not None:
                     if bac_line[item_index] not in res.get_children_values():
                         res.add_child(bac_line[item_index])
-                        if "p. " not in bac_line[item_index]:
+                        if "p." not in bac_line[item_index]:
                             if " bacterium" not in bac_line[item_index]:
                                 if "unclassified" not in bac_line[item_index]:
                                     italics[t].append(bac_line[item_index])
