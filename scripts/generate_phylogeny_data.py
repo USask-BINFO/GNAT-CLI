@@ -140,7 +140,7 @@ def parse_bacterial(line):
         for i in range(len(line)):
             if (len(line[i].split()) > 1 and i < 6) or len(line[i].split()) > 2:
                 popable.append(i)
-            elif "unclassified " in line[i]:
+            if "unclassified " in line[i]:
                 popable.append(i)
         for i in popable[::-1]:
             line.pop(i)
