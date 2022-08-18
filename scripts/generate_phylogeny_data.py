@@ -278,6 +278,8 @@ class BasicTree:
 italics = [[]]
 trees = []
 for bac_line in treelist:
+    if "Tenericutes" in bac_line:
+        print(bac_line)
     for item_index in range(len(bac_line)):
         item = bac_line[item_index]
 
@@ -302,7 +304,6 @@ for bac_line in treelist:
                 if res is not None:
                     if bac_line[item_index] not in res.get_children_values():
                         res.add_child(bac_line[item_index])
-                        print(bac_line)
                         if "p." not in bac_line[item_index]:
                             if " bacterium" not in bac_line[item_index]:
                                 if "unclassified" not in bac_line[item_index]:
