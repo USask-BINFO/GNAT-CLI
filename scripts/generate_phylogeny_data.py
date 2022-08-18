@@ -302,7 +302,7 @@ for bac_line in treelist:
                 if res is not None:
                     if bac_line[item_index] not in res.get_children_values():
                         res.add_child(bac_line[item_index])
-                        print(line)
+                        print(bac_line)
                         if "p." not in bac_line[item_index]:
                             if " bacterium" not in bac_line[item_index]:
                                 if "unclassified" not in bac_line[item_index]:
