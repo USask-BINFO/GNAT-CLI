@@ -2,6 +2,77 @@
 
 # Adds new fungal genomes to the existing fungal genome fasta file and /gbff folder. Makes a new blastp database using the updated fasta file.
 
+if [[ $# -lt 1 ]]; then
+  echo "No arguments provided, use [-h][--help] for usage help."
+  exit 1
+fi
+
+curr_dir=$(pwd)
+out_location=$(pwd)
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--name)
+      name="$2"
+      shift
+      shift
+      ;;
+    -l|--link)
+      link="$2"
+      shift
+      shift
+      ;;
+    -o|--out_location)
+      out_location="$2"
+      shift
+      shift
+      ;;
+    -h|--help)
+      echo "    Script to update/build a blast database."
+      echo "Required Arguments:"
+      echo "  [-n][--name]              Name of database to be built (e.g., fungal, bacterial, viral)"
+      echo "  [-l][--link]              NCBI ftp link to download database from."
+      echo "Optional Arguments:"
+      echo "  [-o][--out_location]      Directory to make database directory. Default='.'"
+      echo ""
+      echo "Note: Recommended to run this script in a screen, may take a very long time to run, "
+      echo "depending on database size. Be sure to have enough space for the database (up to 2 TB)"
+      echo ""
+      exit 0
+      ;;
+    *)
+      echo "Error: "$1" not recognized as a valid argument. Use [-h][--help] for usage help."
+      exit 1
+      ;;
+  esac
+
+if [ -z ${link+x} ]; then
+  if [ -z ${name+x} ]; then
+    echo "Error: neither [-n][--name] nor [-l][--link] specified. Both are required. Use [-h][--help] "
+    echo "for usage help."
+    exit 1
+  else
+    echo "Error: [-l][--link] not specified. Use [-h][--help] for usage help."
+    exit 1
+  fi
+else
+  if [ -z ${name+x} ]; then
+    echo "Error: [-n][--name] not specified. Use [-h][--help] for usage help."
+    exit 1
+  fi
+fi
+
+out_location=$(cd "$out_location" || exit; pwd; cd "$curr_dir" || exit);
+
+echo "Starting..."
+echo "Creating database directory in "$out_location""
+echo "Directory name: "$name"db"
+
+outdir="$out_location"/"$name"db
+mkdir "$outdir"
+
+
+
 MM_YYYY=$(date +%m_%Y)
 
 get_list_of_new_ncbi_fungal_genomes.py | grep -v 'na/na' | sort | uniq > new_fungal_genomes_urls.txt
