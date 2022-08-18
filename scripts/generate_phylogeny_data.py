@@ -151,6 +151,8 @@ def parse_bacterial(line):
 
     if len(line[-1].split()) > 2:
         line[-1] = " ".join(line[-1].split()[:2])
+    if line[1] == "Tenericutes":
+        print(line)
     return line
 
     """for i in range(len(line)):
