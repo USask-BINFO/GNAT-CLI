@@ -155,15 +155,6 @@ def parse_bacterial(line):
         line[-1] = " ".join(line[-1].split()[:2])
     return line
 
-    """for i in range(len(line)):
-        if "unclassified" in line[i]:
-            line = line[:i+1]
-            break
-        if i == len(line) - 1:
-            l = line[i].split(" ")
-            line[i] = " ".join(l[:2])
-    return line"""
-
 
 bacterial = []
 wonky = []
@@ -186,7 +177,7 @@ for line in bacterial:
         pielist.append(newline)
 
 # ----------------------------------------------------------------------------------------------------------------------
-# TODO: Generate phylogenetic tree
+# Generate phylogenetic tree
 class BasicTree:
     """A simple tree class to be used to build a phylogenetic tree."""
     def __init__(self, val=None, depth=0, parent=None):
