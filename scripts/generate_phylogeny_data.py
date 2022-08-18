@@ -168,6 +168,8 @@ def parse_bacterial(line):
 bacterial = []
 wonky = []
 for tax in tax_list:
+    if "Tenericutes" in tax:
+        print(tax)
     try:
         bacterial.append(parse_bacterial(tax))
     except ValueError as e:
@@ -278,8 +280,6 @@ class BasicTree:
 italics = [[]]
 trees = []
 for bac_line in treelist:
-    if "Tenericutes" in bac_line:
-        print(bac_line)
     for item_index in range(len(bac_line)):
         item = bac_line[item_index]
 
