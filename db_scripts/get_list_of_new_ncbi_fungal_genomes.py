@@ -2,12 +2,27 @@
 
 # This file was used to download the bacterial genomes from the NCBI website
 # Only outputs files that are recognized as files
+# First arg = link to database
+# Link to database should be:
+# ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/.../assembly_summary.txt
+# where ... is the path to the specific database you want, some examples below:
+# ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/bacteria/Pseudomonas_aeruginosa/assembly_summary.txt for Pseudomonas aeruginosa db
+# ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/fungi/assembly_summary.txt for fungal db
 
 import urllib.request
-import os.path
-import os
+from os import path
+from sys import argv
 
-response = urllib.request.urlopen("ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/fungi/assembly_summary.txt")
+link = argv[1]
+
+if "ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank" != link[:42]:
+    raise ValueError("Error: Provided link does not appear to be from the ncbi ftp site " +
+    "(ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank). Provided link: '%s'" % link)
+if "/assembly_summary.txt" != link[-21:]:
+    raise ValueError("Error: Provided link doesn't end in /assembly_summary.txt. This file " +
+    "is required to build the database. Provided link: '%s'" % link)
+
+response = urllib.request.urlopen(link)
 data = response.read()
 text = data.decode("utf-8")
 
@@ -40,7 +55,7 @@ for i in range(len(lines)):
     #potentially_existing_filename = os.environ["HOME"] + "/NCBI/bacterial_genomes/gbff/" + filename
     potentially_existing_filename = "/birl2/data/Acr/data/fungal_genomes/gbff/" + filename
 
-    if os.path.isfile(potentially_existing_filename):
+    if path.isfile(potentially_existing_filename):
         pass
         #print(url)
         #print(url + "\t" + str(i) + "\t" + lines[i])
