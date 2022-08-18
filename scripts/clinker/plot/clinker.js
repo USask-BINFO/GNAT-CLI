@@ -624,7 +624,7 @@ function updatePlot() {
 
 // Modify title element (name on tab) to display which file is open
 let filename = window.location.pathname.split("/").pop().split(".")[0];
-document.getElementsByTagName("title")[0].textContent = filename + " (clinker)";
+document.getElementsByTagName("title")[0].textContent = filename.replace(/_/g, " ") + " (clinker)";
 
 
 // Add event listeners to modify cluster labels on mouse hover (enter/exit) to display the full name or shortened name
