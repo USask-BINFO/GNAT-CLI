@@ -67,7 +67,7 @@ else:
         genomes.append(g)
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Parse taxonomy data
+# Obtain taxonomy data
 
 count = 0
 tax_list = []
@@ -128,25 +128,50 @@ def parse_bacterial(line):
     return: Line that is able to be nicely visualized below
     """
     line = remove_erroneous_chars(line)
-    for i in range(len(line)):
+    if line[0] != "Bacteria":
+        if line[0] == "cellular organisms":
+            line.pop(0)
+        elif "Bacteria." in line[0] or "unidentified unclassified sequences" in line[0]:
+            line[0] = "Bacteria"
+        else:
+            raise ValueError("Erroneous item %s at first position in tax line." % line[0])
+    if len(line) > 7:
+        popable = []
+        for i in range(len(line)):
+            if (len(line[i].split()) > 1 and i < 6) or len(line[i].split()) > 2:
+                popable.append(i)
+        for i in popable[::-1]:
+            line.pop(i)
+    return line
+
+    """for i in range(len(line)):
         if "unclassified" in line[i]:
             line = line[:i+1]
             break
         if i == len(line) - 1:
             l = line[i].split(" ")
             line[i] = " ".join(l[:2])
-    return line
+    return line"""
 
 
 bacterial = []
 wonky = []
 for tax in tax_list:
-    # tax = remove_erroneous_chars(tax)
-    if re.match("bacteria", tax[0], re.IGNORECASE):
+    try:
         bacterial.append(parse_bacterial(tax))
-        if tax[0] != "Bacteria":
-            wonky.append(tax)
+    except ValueError as e:
+        print(e)
+        wonky.append(tax)
 
+treelist = bacterial
+pielist = []
+for line in bacterial:
+    while len(line) < 7:
+        line.append(line[-1])
+    if len(line) != 7:
+        raise ValueError("Error: line %s length %i != 7 after parsing." % (str(line), len(line)))
+    else:
+        pielist.append(line)
 
 # ----------------------------------------------------------------------------------------------------------------------
 # TODO: Generate phylogenetic tree
@@ -311,9 +336,5 @@ for tree_index in range(len(trees)):
 
 # ----------------------------------------------------------------------------------------------------------------------
 # TODO: Generate Pie Charts
-class TaxPie:
-    def __init__(self):
-        """
-
-        """
-        return
+# Extend all tax lines to be the same length
+# 
