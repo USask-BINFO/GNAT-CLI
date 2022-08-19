@@ -343,11 +343,12 @@ for tree_index in range(len(trees)):
 tax_list = [({}, "Kingdom"), ({}, "Phylum"), ({}, "Class"), ({}, "Order"), ({}, "Family"), ({}, "Genus"), ({}, "Species")]
 
 for i in range(len(pielist)):
-    level_dict = tax_list[i][0]
-    if pielist[i] in level_dict.keys():
-        level_dict[pielist[i]] += 1
-    else:
-        level_dict[pielist[i]] = 1
+    for j in range(len(pielist[i])):
+        level_dict = tax_list[j][0]
+        if pielist[i][j] in level_dict.keys():
+            level_dict[pielist[i][j]] += 1
+        else:
+            level_dict[pielist[i][j]] = 1
 
 pitalics = []
 for italic in italics:
@@ -383,5 +384,5 @@ for i in range(len(tax_list)):
 
     figname = args.name + "_tax_matches_" + level_name + ".svg"
     plot.savefig(path.join(outlocation, figname), bbox_inches="tight")
-    
+
 
