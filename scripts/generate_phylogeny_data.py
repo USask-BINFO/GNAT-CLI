@@ -334,11 +334,13 @@ for tree_index in range(len(trees)):
         n.img_style = ns
 
     t.img_style = ns
-
-    t.render(path.join(outlocation, args.name+"_phylo_tree_"+str(tree_index)+".svg"), tree_style=ts)
+    if len(trees) > 1:
+        t.render(path.join(outlocation, args.name+"_phylo_tree_"+str(tree_index)+".svg"), tree_style=ts)
+    else:
+        t.render(path.join(outlocation, args.name+"_phylo_tree.svg"), tree_style=ts)
 
 # ----------------------------------------------------------------------------------------------------------------------
-# TODO: Generate Pie Charts
+# Generate Pie Charts
 
 tax_list = [({}, "Kingdom"), ({}, "Phylum"), ({}, "Class"), ({}, "Order"), ({}, "Family"), ({}, "Genus"), ({}, "Species")]
 
