@@ -335,9 +335,53 @@ for tree_index in range(len(trees)):
 
     t.img_style = ns
 
-    t.render(args.name+"_phylo_tree_"+str(tree_index)+".svg", tree_style=ts)
+    t.render(path.join(outlocation, args.name+"_phylo_tree_"+str(tree_index)+".svg"), tree_style=ts)
 
 # ----------------------------------------------------------------------------------------------------------------------
 # TODO: Generate Pie Charts
-# Extend all tax lines to be the same length
-# 
+
+tax_list = [({}, "Kingdom"), ({}, "Phylum"), ({}, "Class"), ({}, "Order"), ({}, "Family"), ({}, "Genus"), ({}, "Species")]
+
+for i in range(len(pielist)):
+    level_dict = tax_list[i][0]
+    if pielist[i] in level_dict.keys():
+        level_dict[pielist[i]] += 1
+    else:
+        level_dict[pielist[i]] = 1
+
+pitalics = []
+for italic in italics:
+    for itali in italic:
+        pitalics.append(itali)
+
+for i in range(len(tax_list)):
+    level_name = tax_list[i][1]
+    level_dict = tax_list[i][0]
+    pie_title = "%s Distribution of \n%s" % (level_name, args.name)
+    
+    total = 0
+    labels = []
+    sizes = []
+    percentages = []
+    for key in level_dict.keys():
+        total += level_dict[key]
+        labels.append(key)
+        sizes.append(level_dict[key])
+    for key in level_dict.keys():
+        percentages.append(str(round((level_dict[key]/total)*100, 2))+"%")
+    
+    for i in range(len(labels)):
+        if labels[i] in pitalics:
+            labels[i] = f"$\it{labels[i]}$"
+        labels[i] += ' (%s)' % percentages[i]
+
+    plot_title = plot.title(pie_title)
+    plot.gca().axis("equal")
+    pie = plot.pie(sizes, startangle=90)
+    plot.legend(pie[0], labels, bbox_to_anchor=(1,0.5), title="Total = %s" % str(total), frameon=False, loc="center left")
+    plot.subplots_adjust(left=0.0, bottom=0.1, right=0.45)
+
+    figname = args.name + "_tax_matches_" + level_name + ".svg"
+    plot.savefig(path.join(outlocation, figname), bbox_inches="tight")
+    
+
