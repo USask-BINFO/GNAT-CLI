@@ -377,6 +377,10 @@ for i in range(len(tax_list)):
                 labels[i] = f"$\it{labels[i].split()[0]}$" + " " + f"$\it{labels[i].split()[1]}$"
             else:
                 labels[i] = f"$\it{labels[i]}$"
+        elif labels[i].split()[0] in pitalics:
+            labels[i] = f"$\it{labels[i].split()[0]}$" + " " + labels[i].split()[1]
+        elif len(labels[i].split()) > 1 and labels[i].split()[1] in pitalics:
+            labels[i] = labels[i].split()[0] + " " + f"$\it{labels[i].split()[1]}$"
         labels[i] += ' (%s)' % percentages[i]
 
     plot_title = plot.title(pie_title)
