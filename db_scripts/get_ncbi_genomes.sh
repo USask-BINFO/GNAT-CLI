@@ -50,8 +50,8 @@ while [[ $# -gt 0 ]]; do
       echo "  [-h][--help]              Prints this message."
       echo "  [-n][--name]              Name of database to be built (e.g., fungal, bacterial, viral). If "
       echo "                              not provided, defaults to the item before 'assembly_summary.txt'"
-      echo "                              in the link. Will be ignored if a valid [-e][--existing_db] is"
-      echo "                              specified."
+      echo "                              (second last item) in the link. Will be ignored if a valid "
+      echo "                              [-e][--existing_db] is specified."
       echo "  [-o][--out_location]      Directory to make database directory. Defaults to current directory."
       echo "                              Will be ignored if a valid [-e][--existing_db] is specified."
       echo ""
@@ -65,25 +65,17 @@ while [[ $# -gt 0 ]]; do
       exit 1
       ;;
   esac
+done
 
-if [ -z ${existing_db+x} ]; then
-
+if [ -z ${name+x} ]; then
+  name=$(echo "$link" | rev | cut -d "/" -f2 | rev);
 fi
 
-if [ -z ${link+x} ]; then
-  if [ -z ${name+x} ]; then
-    echo "Error: neither [-n][--name] nor [-l][--link] specified. Both are required. Use [-h][--help] "
-    echo "for usage help."
-    exit 1
-  else
-    echo "Error: [-l][--link] not specified. Use [-h][--help] for usage help."
-    exit 1
-  fi
-else
-  if [ -z ${name+x} ]; then
-    echo "Error: [-n][--name] not specified. Use [-h][--help] for usage help."
-    exit 1
-  fi
+echo "$name"
+exit 0
+
+if [ -z ${existing_db+x} ]; then
+  true
 fi
 
 out_location=$(cd "$out_location" || exit; pwd; cd "$curr_dir" || exit);
