@@ -9,6 +9,7 @@ fi
 
 curr_dir=$(pwd)
 out_location=$(pwd)
+no_backup="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -27,16 +28,35 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
+    -e|--existing_db)
+      existing_db="$2"
+      shift
+      shift
+      ;;
+    -b|--no_backup)
+      no_backup="true"
+      shift
+      ;;
     -h|--help)
       echo "    Script to update/build a blast database."
       echo "Required Arguments:"
-      echo "  [-n][--name]              Name of database to be built (e.g., fungal, bacterial, viral)"
       echo "  [-l][--link]              NCBI ftp link to download database from."
       echo "Optional Arguments:"
-      echo "  [-o][--out_location]      Directory to make database directory. Default='.'"
+      echo "  [-b][--no_backup]         If this flag is specified, and a valid [-e][--existing_db] was "
+      echo "                              specified (i.e., a database is being updated), then a backup of"
+      echo "                              the old database will not be saved. Default saves a backup."
+      echo "  [-e][--existing_db]       Location of existing database directory to update. If not provided,"
+      echo "                              will build a new database in [-o][--out_location]."
+      echo "  [-h][--help]              Prints this message."
+      echo "  [-n][--name]              Name of database to be built (e.g., fungal, bacterial, viral). If "
+      echo "                              not provided, defaults to the item before 'assembly_summary.txt'"
+      echo "                              in the link. Will be ignored if a valid [-e][--existing_db] is"
+      echo "                              specified."
+      echo "  [-o][--out_location]      Directory to make database directory. Defaults to current directory."
+      echo "                              Will be ignored if a valid [-e][--existing_db] is specified."
       echo ""
       echo "Note: Recommended to run this script in a screen, may take a very long time to run, "
-      echo "depending on database size. Be sure to have enough space for the database (up to 2 TB)"
+      echo "depending on database size. Be sure to have enough space for the database."
       echo ""
       exit 0
       ;;
@@ -45,6 +65,10 @@ while [[ $# -gt 0 ]]; do
       exit 1
       ;;
   esac
+
+if [ -z ${existing_db+x} ]; then
+
+fi
 
 if [ -z ${link+x} ]; then
   if [ -z ${name+x} ]; then
