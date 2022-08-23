@@ -71,9 +71,6 @@ if [ -z ${name+x} ]; then
   name=$(echo "$link" | rev | cut -d "/" -f2 | rev);
 fi
 
-echo "$name"
-exit 0
-
 if [ -z ${existing_db+x} ]; then
   true
 fi
@@ -84,17 +81,16 @@ echo "Starting..."
 echo "Creating database directory in "$out_location""
 echo "Directory name: "$name"db"
 
-outdir="$out_location"/"$name"db
+outdir="$out_location"/"$name"_db
 mkdir "$outdir"
-
-
 
 MM_YYYY=$(date +%m_%Y)
 
-get_list_of_new_ncbi_fungal_genomes.py | grep -v 'na/na' | sort | uniq > new_fungal_genomes_urls.txt
+# NEED PATH TO EXISTING FILE IF UPDATING IN GET_LIST_OF_NEW_NCBI_GENOMES.PY
+get_list_of_new_ncbi_genomes.py "$link" | grep -v 'na/na' | sort | uniq > new_${name}_genomes_urls.txt
 
-mkdir new_fungal_genomes_$$
-cd new_fungal_genomes_$$
+mkdir new_${name}_genomes_$$
+cd new_${name}_genomes_$$
 
 for url in `cat ../new_fungal_genomes_urls.txt`; do bn=`basename $url`; if [ ! -e $bn ]; then echo "Downloading URL $url"; wget -t 1 --timeout=5 $url; else echo "Already downloaded $url"; fi; done
 
