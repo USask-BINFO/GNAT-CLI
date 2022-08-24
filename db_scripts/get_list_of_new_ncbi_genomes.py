@@ -14,6 +14,7 @@ from os import path
 from sys import argv
 
 link = argv[1]
+existing = argv[2]
 
 if "ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank" != link[:42]:
     raise ValueError("Error: Provided link does not appear to be from the ncbi ftp site " +
@@ -53,7 +54,10 @@ for i in range(len(lines)):
     url = dl_directory + "/" + filename
 
     #potentially_existing_filename = os.environ["HOME"] + "/NCBI/bacterial_genomes/gbff/" + filename
-    potentially_existing_filename = "/birl2/data/Acr/data/fungal_genomes/gbff/" + filename
+    if existing != null:
+        potentially_existing_filename = path.join(existing, "gbff/"+filename)
+    else:
+        potentially_existing_filename = None
 
     if path.isfile(potentially_existing_filename):
         pass
@@ -61,3 +65,4 @@ for i in range(len(lines)):
         #print(url + "\t" + str(i) + "\t" + lines[i])
     else:
         print(url)
+
