@@ -54,10 +54,10 @@ for i in range(len(lines)):
     url = dl_directory + "/" + filename
 
     #potentially_existing_filename = os.environ["HOME"] + "/NCBI/bacterial_genomes/gbff/" + filename
-    if existing != null:
+    if existing != "null":
         potentially_existing_filename = path.join(existing, "gbff/"+filename)
     else:
-        potentially_existing_filename = None
+        potentially_existing_filename = "/not/a/a/rea/patha/adf/at"
 
     if path.isfile(potentially_existing_filename):
         pass
