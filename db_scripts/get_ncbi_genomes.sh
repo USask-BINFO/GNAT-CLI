@@ -108,15 +108,15 @@ fi
 
 MM_YYYY=$(date +%m_%Y)
 
-${script_dir}get_list_of_new_ncbi_genomes.py "$link" "$existing" | grep -v 'na/na' | sort | uniq > new_"${name}"_genomes_urls.txt
+${script_dir}get_list_of_new_ncbi_genomes.py "$link" "$existing" | grep -v 'na/na' | sort | uniq > ${outdir}/new_"${name}"_genomes_urls.txt
 
-mkdir new_${name}_genomes_$$
-cd new_${name}_genomes_$$
+mkdir ${outdir}/new_${name}_genomes_$$
+cd ${outdir}/new_${name}_genomes_$$
 
-for url in `cat ../new_"${name}"_genomes_urls.txt`; do bn=`basename $url`; if [ ! -e $bn ]; then echo "Downloading URL $url"; wget -t 1 --timeout=5 $url; else echo "Already downloaded $url"; fi; done
+for url in `cat ${outdir}/new_"${name}"_genomes_urls.txt`; do bn=`basename $url`; if [ ! -e $bn ]; then echo "Downloading URL $url"; wget -t 1 --timeout=5 $url; else echo "Already downloaded $url"; fi; done
 
 # Check for missing genomes
-for genome in $(cat ../new_"${name}"_genomes_urls.txt | cut -d "/" -f 11 | sort | uniq); do if [ ! -e $genome ]; then echo $genome; fi; done
+for genome in $(cat ${outdir}/new_"${name}"_genomes_urls.txt | cut -d "/" -f 11 | sort | uniq); do if [ ! -e $genome ]; then echo $genome; fi; done
 
 # Check for messed-up GBFF files
 # If there are some, they need to be re-downloaded.
@@ -129,24 +129,20 @@ echo Updating all_${name}_proteins.FASTA
 mkdir -p ${outdir}/${name}_genomes/proteins
 mkdir -p ${outdir}/${name}_genomes/gbff
 cat ${outdir}/new_${name}_proteins.FASTA >> ${outdir}/${name}_genomes/proteins/all_${name}_proteins.FASTA
-#rm ../new_fungal_proteins.FASTA
+rm -f ${outdir}/new_${name}_proteins.FASTA
 for thing in `find . -name "*.gbff.gz"`; do mv $thing ${outdir}/${name}_genomes/gbff; done
-cd ..
-#rmdir new_fungal_genomes_$$
+rmdir new_${name}_genomes_$$
 
 cd ${outdir}/${name}_genomes/proteins
 makeblastdb -in ${outdir}/${name}_genomes/proteins/all_${name}_proteins.FASTA -dbtype prot -title ${name}db_$MM_YYYY  -out ${name}db_$MM_YYYY
 
-if [[ "$no_backup" != "true" ]]; then
-  mkdir -p ${outdir}/${name}db_backup
-fi
 mkdir -p ${outdir}/${name}db
-
-# Empty old backup
-rm -rf ${outdir}/${name}db_backup/*
-
-# Move old fungaldb into backup
-mv ${outdir}/${name}db/* ${outdir}/${name}db_backup
+if [[ "$no_backup" != "true" ]]; then
+  # Backup things
+  mkdir -p ${outdir}/${name}db_backup
+  rm -rf ${outdir}/${name}db_backup/*
+  mv ${outdir}/${name}db/* ${outdir}/${name}db_backup
+fi
 
 # Move new db into main db folder
 mv ${name}db_$MM_YYYY.* ${outdir}/${name}db
@@ -156,6 +152,7 @@ cd ${outdir}/${name}db
 
 cat ${name}db_$MM_YYYY.pal | ${script_dir}split_pal.py
 
+cd ${curr_dir}
 # If, in the future, the viral database gets large enough, may need to add split_pal.py into the pipeline. For now, database is small enough that no .pal files are generated.
 # Don't do this because it takes a long time and don't think it does anything... Was copy pasted from update_ncbi_bacterial_genomes.sh. Leaving the code in case someone finds it useful in the future.
 # Make new locus to filename map
