@@ -13,6 +13,11 @@ no_backup="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    -s|--db_scripts)
+      db_scripts="$2"
+      shift
+      shift
+      ;;
     -n|--name)
       name="$2"
       shift
@@ -41,6 +46,7 @@ while [[ $# -gt 0 ]]; do
       echo "    Script to update/build a blast database."
       echo "Required Arguments:"
       echo "  [-l][--link]              NCBI ftp link to download database from."
+      echo "  [-s][--db_scripts]        Path to directory containing db_scripts."
       echo "Optional Arguments:"
       echo "  [-b][--no_backup]         If this flag is specified, and a valid [-e][--existing_db] was "
       echo "                              specified (i.e., a database is being updated), then a backup of"
@@ -67,72 +73,91 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+echo "Starting..."
+
+if [ -z ${db_scripts+x} ]; then
+  echo "Must specify a path to the directory containing the database scripts."
+  exit 1
+else
+  script_dir=$(cd "$db_scripts" || exit; pwd; cd "$curr_dir" || exit;)
+  script_dir="$script_dir/"
+fi
+
+if [ -z ${link+x} ]; then
+  echo "Must specify a link to download the database from."
+  exit 1
+fi
+
 if [ -z ${name+x} ]; then
   name=$(echo "$link" | rev | cut -d "/" -f2 | rev);
 fi
 
-if [ -z ${existing_db+x} ]; then
-  true
-fi
-
 out_location=$(cd "$out_location" || exit; pwd; cd "$curr_dir" || exit);
 
-echo "Starting..."
-echo "Creating database directory in "$out_location""
-echo "Directory name: "$name"db"
-
-outdir="$out_location"/"$name"_db
-mkdir "$outdir"
+if [ -z ${existing_db+x} ]; then
+  echo "Creating database directory in $out_location"
+  echo "Directory name: ${name}_db"
+  outdir="$out_location"/"${name}"_db
+  mkdir "$outdir"
+  existing="null"
+else
+  existing=$(cd "$existing_db" || exit; pwd; cd "$curr_dir" || exit);
+  outdir="$existing"
+  echo "Updating database at $existing"
+fi
 
 MM_YYYY=$(date +%m_%Y)
 
-# NEED PATH TO EXISTING FILE IF UPDATING IN GET_LIST_OF_NEW_NCBI_GENOMES.PY
-get_list_of_new_ncbi_genomes.py "$link" | grep -v 'na/na' | sort | uniq > new_${name}_genomes_urls.txt
+${script_dir}get_list_of_new_ncbi_genomes.py "$link" "$existing" | grep -v 'na/na' | sort | uniq > new_"${name}"_genomes_urls.txt
 
 mkdir new_${name}_genomes_$$
 cd new_${name}_genomes_$$
 
-for url in `cat ../new_fungal_genomes_urls.txt`; do bn=`basename $url`; if [ ! -e $bn ]; then echo "Downloading URL $url"; wget -t 1 --timeout=5 $url; else echo "Already downloaded $url"; fi; done
+for url in `cat ../new_"${name}"_genomes_urls.txt`; do bn=`basename $url`; if [ ! -e $bn ]; then echo "Downloading URL $url"; wget -t 1 --timeout=5 $url; else echo "Already downloaded $url"; fi; done
 
 # Check for missing genomes
-for genome in $(cat ../new_fungal_genomes_urls.txt | cut -d "/" -f 11 | sort | uniq); do if [ ! -e $genome ]; then echo $genome; fi; done
+for genome in $(cat ../new_"${name}"_genomes_urls.txt | cut -d "/" -f 11 | sort | uniq); do if [ ! -e $genome ]; then echo $genome; fi; done
 
 # Check for messed-up GBFF files
 # If there are some, they need to be re-downloaded.
 # This needs to be done before creating the locus map, otherwise it will give an error.
-../check_gbff.gz_files.py . > ../messed_up_fungal_gbff_files.txt
+#../check_gbff.gz_files.py . > ../messed_up_BLAH_gbff_files.txt
 
-echo Making new_fungal_proteins.FASTA
-../make_gbff_protein_fasta.py . > /birl2/data/Acr/new_fungal_proteins.FASTA
-echo Updating all_fungal_proteins.FASTA
-cat /birl2/data/Acr/new_fungal_proteins.FASTA >> /birl2/data/Acr/data/fungal_genomes/proteins/all_fungal_proteins.FASTA
+echo Making new_"${name}"_proteins.FASTA
+${script_dir}make_gbff_protein_fasta.py . > ${outdir}/new_${name}_proteins.FASTA
+echo Updating all_${name}_proteins.FASTA
+mkdir -p ${outdir}/${name}_genomes/proteins
+mkdir -p ${outdir}/${name}_genomes/gbff
+cat ${outdir}/new_${name}_proteins.FASTA >> ${outdir}/${name}_genomes/proteins/all_${name}_proteins.FASTA
 #rm ../new_fungal_proteins.FASTA
-for thing in `find . -name "*.gbff.gz"`; do mv $thing /birl2/data/Acr/data/fungal_genomes/gbff; done
+for thing in `find . -name "*.gbff.gz"`; do mv $thing ${outdir}/${name}_genomes/gbff; done
 cd ..
 #rmdir new_fungal_genomes_$$
 
-cd /birl2/data/Acr/data/fungal_genomes/proteins
-makeblastdb -in /birl2/data/Acr/data/fungal_genomes/proteins/all_fungal_proteins.FASTA -dbtype prot -title fungaldb_$MM_YYYY  -out fungaldb_$MM_YYYY
+cd ${outdir}/${name}_genomes/proteins
+makeblastdb -in ${outdir}/${name}_genomes/proteins/all_${name}_proteins.FASTA -dbtype prot -title ${name}db_$MM_YYYY  -out ${name}db_$MM_YYYY
 
-mkdir -p /birl2/data/Acr/data/fungaldb_backup
-mkdir -p /birl2/data/Acr/data/fungaldb
+if [[ "$no_backup" != "true" ]]; then
+  mkdir -p ${outdir}/${name}db_backup
+fi
+mkdir -p ${outdir}/${name}db
 
-# Empty old fungaldb backup
-rm -rf /birl2/data/Acr/data/fungaldb_backup/*
+# Empty old backup
+rm -rf ${outdir}/${name}db_backup/*
 
 # Move old fungaldb into backup
-mv /birl2/data/Acr/data/fungaldb/* /birl2/data/Acr/data/fungaldb_backup
+mv ${outdir}/${name}db/* ${outdir}/${name}db_backup
 
 # Move new db into main db folder
-mv fungaldb_$MM_YYYY.* /birl2/data/Acr/data/fungaldb
+mv ${name}db_$MM_YYYY.* ${outdir}/${name}db
 
 # Generate all_pal_files.txt for psi-BLAST searches
-cd /birl2/data/Acr/data/fungaldb
+cd ${outdir}/${name}db
 
-cat fungaldb_$MM_YYYY.pal | ../../split_pal.py
+cat ${name}db_$MM_YYYY.pal | ${script_dir}split_pal.py
 
 # If, in the future, the viral database gets large enough, may need to add split_pal.py into the pipeline. For now, database is small enough that no .pal files are generated.
-# Don't do this because it takes a long time and don't think it does anything... Was copy pasted from update_ncbi_bacterial_genomes.sh. Leaving the code in case someone finds it useful in the future. 
+# Don't do this because it takes a long time and don't think it does anything... Was copy pasted from update_ncbi_bacterial_genomes.sh. Leaving the code in case someone finds it useful in the future.
 # Make new locus to filename map
 #cd /birl2/users/mdt442/data/bacterial_genomes/gbff
 #create_locus_map.py /birl2/users/mdt442/bacterial_genomes/gbff > /birl2/users/mdt442/acr_aca_misc_data/locus_to_filename_map.txt
