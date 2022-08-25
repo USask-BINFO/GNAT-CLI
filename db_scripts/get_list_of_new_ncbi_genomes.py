@@ -57,9 +57,6 @@ for i in range(len(lines)):
     if existing != "null":
         existing = existing.rstrip("/")
         name = existing.split("/")[-1][:-3]
-        print(name)
-        print(existing)
-        print(path.join(existing, name+"_genomes", "gbff", filename))
         potentially_existing_filename = path.join(existing, name+"_genomes", "gbff", filename)
     else:
         potentially_existing_filename = "/not/a/a/rea/patha/adf/at"
