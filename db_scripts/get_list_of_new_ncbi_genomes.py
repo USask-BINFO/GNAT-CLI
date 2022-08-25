@@ -55,7 +55,12 @@ for i in range(len(lines)):
 
     #potentially_existing_filename = os.environ["HOME"] + "/NCBI/bacterial_genomes/gbff/" + filename
     if existing != "null":
-        potentially_existing_filename = path.join(existing, "gbff/"+filename)
+        existing = existing.rstrip("/")
+        name = existing.split("/")[-1][:-3]
+        print(name)
+        print(existing)
+        print(path.join(existing, name+"_genomes", "gbff", filename))
+        potentially_existing_filename = path.join(existing, name+"_genomes", "gbff", filename)
     else:
         potentially_existing_filename = "/not/a/a/rea/patha/adf/at"
 
