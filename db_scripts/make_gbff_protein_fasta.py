@@ -13,7 +13,7 @@ parser.add_argument("gbff_dir", type=str, help="Directory containing GBFF files"
 
 args = parser.parse_args()
 
-onlyfiles = [f for f in listdir(args.gbff_dir) if isfile(join(args.gbff_dir, f))]
+onlyfiles = [join(args.gbff_dir, f) for f in listdir(args.gbff_dir) if isfile(join(args.gbff_dir, f))]
 
 i = 1
 
