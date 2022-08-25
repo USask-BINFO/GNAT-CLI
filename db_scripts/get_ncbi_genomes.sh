@@ -131,7 +131,7 @@ mkdir -p ${outdir}/${name}_genomes/gbff
 cat ${outdir}/new_${name}_proteins.FASTA >> ${outdir}/${name}_genomes/proteins/all_${name}_proteins.FASTA
 rm -f ${outdir}/new_${name}_proteins.FASTA
 for thing in `find . -name "*.gbff.gz"`; do mv $thing ${outdir}/${name}_genomes/gbff; done
-rmdir new_${name}_genomes_$$
+rmdir new_${name}_genomes_*
 
 cd ${outdir}/${name}_genomes/proteins
 makeblastdb -in ${outdir}/${name}_genomes/proteins/all_${name}_proteins.FASTA -dbtype prot -title ${name}db_$MM_YYYY  -out ${name}db_$MM_YYYY
