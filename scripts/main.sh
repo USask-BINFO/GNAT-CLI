@@ -232,6 +232,12 @@ do
   "${script_dir}"parse_psiblast_out.py "$file" -m "$label_file_location" > parsed_outs/"$(basename "$file")".parsed
 done
 
+# Check if queries had any matches, if not, exit
+match_lines=$(cat parsed_outs/* | wc -l)
+if [[ match_lines -eq 0 ]]; then
+  echo "No psi-BLAST matches to any query, exiting..."
+  exit 0
+fi
 
 mkdir data
 # Create a subdirectory for each query
