@@ -513,6 +513,9 @@ class Gene(Serializer):
                         self.names["psi_blast_match"] = None
                         self.names["match_short"] = None
                         self.names["match_very_short"] = None
+                    if "product" in self.names:
+                        if self.names["product"] == "hypothetical protein":
+                            self.names["product"] = ""
 
         except FileNotFoundError:
             LOG.info("all_match_names.txt does not exist in this directory. gene['names']['psi_blast_match'] will "
