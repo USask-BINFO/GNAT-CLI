@@ -34,14 +34,17 @@ if args.out is not None:
     outdir = args.out
 else:
     outdir = "."
+# Ensure outdir ends with a slash
 if outdir[-1] != "/":
     outdir += "/"
 
+# Name phylogeny data directory with or without data type
 if args.data_type is not None:
     phylodir_name = "%s_%s_phylogeny_data" % (args.name, args.data_type)
 else:
     phylodir_name = "%s_phylogeny_data" % args.name
 
+# Create the director
 if args.data_type == "bacterial":
     if not path.isdir(path.join(outdir, phylodir_name)):
         makedirs(path.join(outdir, phylodir_name))
