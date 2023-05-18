@@ -163,6 +163,7 @@ if [ -z ${query_directory+x} ]; then
 else
   if [ ! -z ${psiblast_out_directory+x} ]; then
     echo "Error: Only one of [-q][--query_directory] and [-p][--psiblast_out_directory] may be specified."
+    exit 1
   else
     query_directory=$(cd "$query_directory" || exit; pwd; cd "$curr_dir" || exit;)
   fi
@@ -205,10 +206,11 @@ mkdir parsed_outs
 cd psiblast_out || exit 1
 
 if [ ! -z ${query_directory+x} ]; then
-  # Run Psi-BLASTs
+  # If -q was specified, run Psi-BLASTs
   echo "Running Psi-BLASTs"
   "${script_dir}"run_psiblasts.sh "$database" "$query_directory" "$evalue" "$num_iter"
 else
+  # Else, copy Psi-BLAST outputs from specified directory
   echo "Using Psi-BLAST outputs from $psiblast_out_directory"
   for file in $(ls "$psiblast_out_directory" | grep ".all.out"); do
     cp "$psiblast_out_directory"/"$file" ".";
@@ -240,7 +242,7 @@ if [[ match_lines -eq 0 ]]; then
 fi
 
 mkdir data
-# Create a subdirectory for each query
+# Create a subdirectory for each query with matches
 for query in parsed_outs/*.parsed
 do
   v=$(cat "$query" | wc -l)
@@ -257,13 +259,12 @@ done
 # Filter GNs based on size, PID, redundancy, kmer. Generate phylo data for each filtering step
 for dir in data/*
 do
-  # TODO: rewrite phylo script
-  # TODO Raw Phylo Data
+  # Generate phylo data for all of the GNs generated
   "${script_dir}"generate_phylogeny_data.py "$dir" -n $(basename "$dir" | cut -f1 -d '.')_raw -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$dir"
 
   # Remove redundants based on aa-seq
   "${script_dir}"redundancy.py "$dir"
-  # TODO Non-Redundant Phylo Data
+  # Generate phylo data for all the non-redundant GNs
   "${script_dir}"generate_phylogeny_data.py "$dir" -n $(basename "$dir" | cut -f1 -d '.')_non_redundant -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$dir"
 
   # Copy all GNs into new non-redundants directory
@@ -275,7 +276,7 @@ do
   if [[ $(ls "$dir"/all_non_redundants | wc -l) -gt 0 ]]; then
       for cluster_dir in "$dir"/all_non_redundants/*_cluster_*
         do
-        # TODO Cluster Phylo Data
+        # Generate phylo data and clinker plots for each cluster in all_non_redundants
           "${script_dir}"generate_phylogeny_data.py "$cluster_dir" -n $(basename "$cluster_dir") -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$cluster_dir"
           "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location"
         done
@@ -285,20 +286,20 @@ do
   "${script_dir}"pid_filter.py parsed_outs/"$(basename "$dir")" -f "$dir" -t "$pid_threshold"
   for h in "$dir"/*homologous
   do
-    # TODO PID Phylo Data
+    # Generate phylo data for both PID filtered directories
     "${script_dir}"generate_phylogeny_data.py "$h" -n $(basename "$h") -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$h" 
     # Split GNs into two directories based on size (within/outside 20% (default) query protein length)
     "${script_dir}"size_filter.py parsed_outs/"$(basename "$dir")" -f "$h" -t "$length_threshold"
     for s in "$h"/*size
     do
-      # TODO Size Phylo Data
+      # Generate phylo data for both size filtered directories
       "${script_dir}"generate_phylogeny_data.py "$s" -n $(basename "$s") -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$s"
       # Generate kmer clusters (second argument is for first part of cluster dir name)
       "${script_dir}"find_clusters.py "$s" "$(basename "$s")"
       if [[ $(ls "$s" | wc -l) -gt 0 ]]; then
       for cluster_dir in "$s"/*_cluster_*
         do
-          # TODO Cluster Phylo Data
+          # Generate phylo data and clinker plots for each cluster
           "${script_dir}"generate_phylogeny_data.py "$cluster_dir" -n $(basename "$cluster_dir") -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$cluster_dir"
           "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location"
         done
