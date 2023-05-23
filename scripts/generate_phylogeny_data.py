@@ -44,7 +44,8 @@ if args.data_type is not None:
 else:
     phylodir_name = "%s_phylogeny_data" % args.name
 
-# Create the director
+# Create the directory to store the trees and pie charts, or if just generating .csv file, set
+# output location to outdir
 if args.data_type == "bacterial":
     if not path.isdir(path.join(outdir, phylodir_name)):
         makedirs(path.join(outdir, phylodir_name))
@@ -52,10 +53,12 @@ if args.data_type == "bacterial":
 else:
     outlocation = outdir
 
-# Check if a directory was provided, and get genome names
+# Check if a directory or one or more GN files were provided, and get genome names
 genomes = []
+# If there is only one argument, it is either a single file or a directory
 if len(args.GNs) == 1:
     if path.isdir(args.GNs[0]):
+        # If it is a directory, append only the GN files to genomes
         for file in listdir(args.GNs[0]):
             if args.mode != "GBFF":
                 if '.gb' == file[-3:]:
@@ -64,8 +67,10 @@ if len(args.GNs) == 1:
                 if '.gbff.gz' == file[-8:]:
                     genomes.append(path.join(args.GNs[0], file))
     else:
+        # If it is a single file, set the list of genomes to be it
         genomes = args.GNs
 else:
+    # If there are multiple arguments, append them all to genomes, as they should all be GNs
     for g in args.GNs:
         genomes.append(g)
 
@@ -120,7 +125,7 @@ def remove_erroneous_chars(line):
     for i in range(len(line)):
         result = re.sub('[^a-zA-Z. ]', '', line[i])
         result = re.sub('[_]', ' ', result)
-        line[i] = result
+        line[i] = result.strip()
     return line
 
 
