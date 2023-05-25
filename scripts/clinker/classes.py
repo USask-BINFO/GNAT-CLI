@@ -481,6 +481,10 @@ class Gene(Serializer):
         self.sequence = sequence
         self.translation = translation
 
+        if "product" in self.names:
+            if self.names["product"] == "hypothetical protein":
+                self.names["product"] = ""
+
         try:
             #print(labelfilelocation)
             lf = labelfilelocation[0]
