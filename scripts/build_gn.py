@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """
 Program used to isolate the gene clusters of the psiblast matches of Acr/Aca proteins. Can add a command-line arg to
 modify the n param in find_cluster()

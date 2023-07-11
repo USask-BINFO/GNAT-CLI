@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """
 Script to remove duplicated accessions (keeps accession with lowest e-value) from psi-BLAST output.
 """

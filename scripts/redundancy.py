@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """
 Script to filter out redundant (identical) genomic neighbourhoods without relying on time-consuming clinker alignments.
 """

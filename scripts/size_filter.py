@@ -1,5 +1,4 @@
-#! /usr/bin/env python
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """
 Move GNs based on relative size to query
 """

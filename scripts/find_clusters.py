@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """
 Class to generate GN clusters based on kmer features in GN nucleotide sequences.
 """
