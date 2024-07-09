@@ -64,7 +64,7 @@ class Cluster:
             k = 2
 
         try:
-            estimator = KMeans(n_clusters=k, algorithm="full")
+            estimator = KMeans(n_clusters=k, algorithm="lloyd")
             labels = estimator.fit_predict(matrix)
         except ConvergenceWarning:
             indices = [i for i in range(len(matrix))]

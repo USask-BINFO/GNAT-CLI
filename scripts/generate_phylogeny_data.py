@@ -27,6 +27,7 @@ parser.add_argument("-m", "--mode", default="GN", help="Specify file type: GBFF 
 parser.add_argument("-dt", "--data_type", help="Expected data source (bacterial, fungal, viral, etc.) for generating " 
                     "phylogenetic data. If 'bacterial', will generate phylogenetic trees and pie charts, else will "
                     "only output a csv containing the data.")
+parser.add_argument("-tf", "--tax_flag", help="Flag to indicate whether or not to generate phylogenetic trees and pies.")
 
 args = parser.parse_args()
 
@@ -110,7 +111,7 @@ for line in tax_list:
 with open(path.join(outlocation, outfilename), "w") as f:
     f.write(taxstr)
 
-if args.data_type != "bacterial":   # Exit here to prevent generation of phylo figures if datatype isn't bacterial
+if args.data_type != "true":   # Exit here to prevent generation of phylo figures if datatype isn't bacterial
     exit()
 
 # ----------------------------------------------------------------------------------------------------------------------
