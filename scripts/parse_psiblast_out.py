@@ -56,57 +56,57 @@ for query_acc in separated_lines.keys():
 
         outstr += res_line + '\n'
 
-with open(os.path.basename(args.psi_filename).split('.')[0] + "_" + query_acc + ".parsed", "w") as f:
-    f.write(outstr)
-# if args.out:
-#     with open(args.out, "w") as f:
-#         f.write(outstr)
-# else:
-#     stdout.write(outstr)
+    with open(os.path.basename(args.psi_filename).split('.')[0] + "_" + query_acc + ".parsed", "w") as f:
+        f.write(outstr)
+    # if args.out:
+    #     with open(args.out, "w") as f:
+    #         f.write(outstr)
+    # else:
+    #     stdout.write(outstr)
 
-# # Master file modification/creation
-# existing_lines = []
-# if args.master:
-#     master = args.master
-#     with open(args.master, "r") as f:
-#         existing_lines = [line.rstrip().split() for line in f]
-# else:
-#     # Check if master file exists in current directory if args.master not specified
-#     try:
-#         with open("all_match_names.txt", "r") as f:
-#             existing_lines = [line.rstrip().split() for line in f]
-#     except FileNotFoundError:
-#         pass
-#     master = "all_match_names.txt"
+    # # Master file modification/creation
+    # existing_lines = []
+    # if args.master:
+    #     master = args.master
+    #     with open(args.master, "r") as f:
+    #         existing_lines = [line.rstrip().split() for line in f]
+    # else:
+    #     # Check if master file exists in current directory if args.master not specified
+    #     try:
+    #         with open("all_match_names.txt", "r") as f:
+    #             existing_lines = [line.rstrip().split() for line in f]
+    #     except FileNotFoundError:
+    #         pass
+    #     master = "all_match_names.txt"
 
-# existing_matches = []
-# existing_genes = []
-# existing_evals = []
-# for line in existing_lines:
-#     existing_matches.append(line[0])
-#     existing_genes.append(line[1])
-#     existing_evals.append(line[2])
+    # existing_matches = []
+    # existing_genes = []
+    # existing_evals = []
+    # for line in existing_lines:
+    #     existing_matches.append(line[0])
+    #     existing_genes.append(line[1])
+    #     existing_evals.append(line[2])
 
-# existing_dict = {}
-# for i in range(len(existing_matches)):
-#     existing_dict[existing_matches[i]] = (existing_genes[i], existing_evals[i], i)
+    # existing_dict = {}
+    # for i in range(len(existing_matches)):
+    #     existing_dict[existing_matches[i]] = (existing_genes[i], existing_evals[i], i)
 
-# for key in acc_dict.keys():
-#     line = acc_dict[key][0].split()
-#     e = acc_dict[key][1]
-#     if line[1].split("|")[2] not in existing_matches:
-#         existing_lines.append([line[1].split("|")[2], line[0], line[13]])
-#     else:
-#         # Protein acc. already in the master file from another Acr, keep acc with lowest eval
-#         new_eval = e
-#         old_eval = existing_dict[line[1].split("|")[2]][1]
-#         if Decimal(new_eval) < Decimal(old_eval):
-#             existing_lines[existing_dict[line[1].split("|")[2]][2]] = [line[1].split("|")[2], line[0], line[13]]
+    # for key in acc_dict.keys():
+    #     line = acc_dict[key][0].split()
+    #     e = acc_dict[key][1]
+    #     if line[1].split("|")[2] not in existing_matches:
+    #         existing_lines.append([line[1].split("|")[2], line[0], line[13]])
+    #     else:
+    #         # Protein acc. already in the master file from another Acr, keep acc with lowest eval
+    #         new_eval = e
+    #         old_eval = existing_dict[line[1].split("|")[2]][1]
+    #         if Decimal(new_eval) < Decimal(old_eval):
+    #             existing_lines[existing_dict[line[1].split("|")[2]][2]] = [line[1].split("|")[2], line[0], line[13]]
 
-# all_str = ""
-# for line in existing_lines:
-#     all_str += line[0] + "\t" + line[1] + "\t" + line[2] + "\n"
+    # all_str = ""
+    # for line in existing_lines:
+    #     all_str += line[0] + "\t" + line[1] + "\t" + line[2] + "\n"
 
-# with open(master, "w") as f:
-#     f.write(all_str)
+    # with open(master, "w") as f:
+    #     f.write(all_str)
 

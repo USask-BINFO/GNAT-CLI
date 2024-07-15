@@ -215,6 +215,12 @@ cd "$outdir" || exit 1
 
 # Check if a query file was provided, if so, run PSI-BLASTs
 if [ ! -z ${query_file+x} ]; then
+  # Get the absolute path to the query_file
+  working_dir=$(pwd)
+  cd "$curr_dir" || exit 1
+  cd "$(dirname "$query_file")" || exit 1
+  query_file="$(pwd)"/"$(basename "$query_file")"
+
   echo "Query file: $(basename $query_file)"
   echo "Query file: $(basename $query_file)" >> "$logfile"
   echo "Running PSI-BLASTs"
@@ -230,6 +236,13 @@ if [ ! -z ${query_file+x} ]; then
 
   query_filename=$(basename "$query_file")
   psiblast_out_file="$outdir"/"${query_filename%.fasta}".out
+fi
+
+# Check if there was any PSI-BLAST output
+if [ ! -f "$psiblast_out_file" ]; then
+  echo "No PSI-BLAST matches to any query. Exiting..." >> "$logfile"
+  echo "No PSI-BLAST matches to any query. Exiting..."
+  exit 0
 fi
 
 # Create and assign label_file_location if not specified
@@ -284,10 +297,10 @@ do
   fi
 done
 
-# Check if queries had any matches, if not, exit
+# Check if there are any matches after filtering, if not, exit. (I don't think this check is necessary, but leaving it in just in case)
 if [[ $num_matches -eq 0 ]]; then
-  echo "No PSI-BLAST matches to any query. Exiting..." >> "$logfile"
-  echo "No PSI-BLAST matches to any query. Exiting..."
+  echo "No non-redundant PSI-BLAST matches to any query. Exiting..." >> "$logfile"
+  echo "No non-redundant PSI-BLAST matches to any query. Exiting..."
   exit 0
 fi
 
