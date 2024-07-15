@@ -49,3 +49,4 @@ filename=$(basename "$FASTAFILE")
 no_ext="${filename%.*}"
 
 cat outfile.out | grep -v '^$' | grep -v 'CONVERGED' > "$no_ext".out
+rm -f outfile.out

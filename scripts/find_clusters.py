@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 """
 Class to generate GN clusters based on kmer features in GN nucleotide sequences.
 """
@@ -10,9 +10,12 @@ from sklearn.cluster import KMeans
 from sklearn.exceptions import ConvergenceWarning
 import argparse
 from shutil import move
+import math
 
-import kmer
+import kmer as kmer
 import warnings
+
+import generate_svg
 
 warnings.simplefilter("error", ConvergenceWarning)
 
@@ -64,7 +67,7 @@ class Cluster:
             k = 2
 
         try:
-            estimator = KMeans(n_clusters=k, algorithm="lloyd")
+            estimator = KMeans(n_clusters=k, algorithm="lloyd", n_init=10) # Used to be algorithm="full" and no n_init, but prev n_init default was 10 so keeping like this
             labels = estimator.fit_predict(matrix)
         except ConvergenceWarning:
             indices = [i for i in range(len(matrix))]
@@ -324,10 +327,11 @@ def main():
     parser.add_argument("-o", "--out_dir", help="Name of directory to send clusters to. Defaults to gn_dir.")
     parser.add_argument("-k", type=int, help="Size of kmers (default=3). Increasing this will drastically increase "
                                              "runtime.", default=3)
-    parser.add_argument("-s", "--cluster_size", type=int, default=20, help="Desired number of GNs per cluster. "
-                                                                           "(default 20)")
-    parser.add_argument("--min_thresh", type=int, default=10, help="Lowest number of GNs per cluster (default 10).")
-    parser.add_argument("--max_thresh", type=int, default=30, help="Highest number of GNs per cluster (default 30).")
+    parser.add_argument("-s", "--cluster_size", type=int, default=10, help="Desired number of GNs per cluster. "
+                                                                           "(default 10)")
+    parser.add_argument("--min_thresh", type=int, default=5, help="Lowest number of GNs per cluster (default 5).")
+    parser.add_argument("--max_thresh", type=int, default=15, help="Highest number of GNs per cluster (default 15).")
+    parser.add_argument("--max_genes", type=int, default=41, help="Maximum number of genes that can be in a GN (default 41). This doesn't affect the generation of GNs, it just tells the program how genes to expect in each.")
 
     args = parser.parse_args()
 
@@ -358,6 +362,223 @@ def main():
         c = Cluster(args.gn_dir, k=args.k)
         clusters = c.sized_clusters(min_thresh=args.min_thresh, max_thresh=args.max_thresh, desired_size=args.cluster_size)
 
+    # Calculate a score and the 'average' GN for each cluster to determine the ordering of the cluster directories
+    cluster_scores = []
+
+    # Initialize dict to store the 'average' GN and addtl data for each cluster
+    # Key is cluster stored in cluster_scores, value is:
+        # {'avg_orientations': [1, 1, 1, -1, -1, 1, 0, 1, 1, -1, -1, 1, -1], 'num_GNs': int}
+        # Where the sign is the orientation of the gene (0 is the match, always forward strand +)
+    average_representations = {}
+
+    for cluster in clusters:
+        score = 0 # init cluster score
+        all_orientations = []
+
+        if c is not None:
+            names = c.index_list_to_genbank(cluster)
+        else:
+            names = cluster
+        
+        for gn in names:
+            # This is used to help calculate the 'average' orientations
+            orientations = {'before': [], 'match': [], 'after': []}
+            current_block = []
+            query_block_flag = -1 # < 0 before match block, 0 at match block, > 0 after match block
+            
+            # Numbers for scoring
+            num_genes = 0
+            num_query_block = 0
+            num_orientation_blocks = 0
+
+            # Slice name of match off of gb filename
+            query_match_name = gn.split("_")[-2]
+            gn_score = 0 # init GN score
+            with open(path.join(args.gn_dir, gn), "r") as gn_file:
+                for record in SeqIO.parse(gn_file, "genbank"):
+                    # Extract the orientation blocks (and update scoring numbers)
+                    for feature in record.features:
+                        if feature.type == "CDS":
+                            num_genes += 1
+
+                            # Handle first gene
+                            if len(current_block) == 0:
+                                current_block.append(feature)
+                            
+                            # Handle genes in same block
+                            elif feature.strand == current_block[-1].strand:
+                                current_block.append(feature)
+                            
+                            # Handle block flip (current strand != prev strand)
+                            else:
+                                # Figure out if the new block contains the query match
+                                for f in range(len(current_block)):
+                                    feat = current_block[f]
+                                    if "protein_id" in feat.qualifiers and query_match_name in feat.qualifiers['protein_id']:
+                                        query_block_flag = 0
+                                        orientations['match_idx'] = f
+                                    
+                                if query_block_flag < 0:
+                                    orientations['before'].append(current_block)
+
+                                elif query_block_flag == 0:
+                                    orientations['match'].append(current_block)
+                                    orientations['match_strand'] = current_block[0].strand
+                                    query_block_flag += 1
+
+                                else:
+                                    orientations['after'].append(current_block)
+
+                                # Wipe current_block
+                                current_block = [feature]
+
+                    # Ensure last block also gets added
+                    for f in range(len(current_block)):
+                        feat = current_block[f]
+                        if "protein_id" in feat.qualifiers and query_match_name in feat.qualifiers['protein_id']:
+                            query_block_flag = 0
+                            orientations['match_idx'] = f
+                        
+                    if query_block_flag < 0:
+                        orientations['before'].append(current_block)
+
+                    elif query_block_flag == 0:
+                        orientations['match'].append(current_block)
+                        orientations['match_strand'] = current_block[0].strand
+                        query_block_flag += 1
+
+                    else:
+                        orientations['after'].append(current_block)
+
+                    num_orientation_blocks = len(orientations['before']) + len(orientations['match']) + len(orientations['after'])
+
+            gn_score = 5 * (num_genes/args.max_genes) # Favour closer to max num genes in each GN (high weight)
+            gn_score += 2 * (num_query_block/num_genes) # Favour more genes in the same naive synteny block as query match (moderate weight)
+            gn_score += 1 * max(0, (num_genes/num_orientation_blocks) - 4)/max((num_genes-4),1) # Favour synteny blocks larger than 4 genes on avg (low weight)
+            gn_score = gn_score / 8 # Ensure values are [0,1] by dividing by sum of weights
+            score += gn_score
+
+            orientations["name"] = gn
+
+            all_orientations.append(orientations)
+        
+        score = score/len(names) # Normalize GN scores by dividing by number of GNs
+        score *= 2     # Weighting the GN portion of the score
+        
+        # Calculate another term to reward GN clusters having closest to args.cluster_size (default 20) GNs, falling off to 0
+        half_dist = (args.cluster_size - args.min_thresh)/2
+        gaussian_score = math.exp(-((len(names) - args.cluster_size)**2))/(half_dist**2)
+
+        score += gaussian_score
+        score /= 3 # Normalize [0,1]
+
+        cluster_scores.append((cluster, score))
+
+        for i in range(len(all_orientations)):
+            # Change the representation of the orientation blocks
+            before = all_orientations[i]["before"]
+            match = all_orientations[i]["match"]
+            after = all_orientations[i]["after"]
+            
+            match = [1 for _ in range(len(match[0]))]
+            match[all_orientations[i]["match_idx"]] = 0
+
+            multiplier = -1
+            new_before = []
+            for j in range(len(before)-1,-1,-1):
+                new_before = [1 * multiplier for _ in range(len(before[j]))] + new_before
+                multiplier *= -1
+            before = new_before
+
+            multiplier = -1
+            new_after = []
+            for j in range(len(after)):
+                new_after += [1 * multiplier for _ in range(len(after[j]))]
+                multiplier *= -1
+            after = new_after
+
+            if all_orientations[i]["match_strand"] == -1:
+                # If match is on the negative strand, flip the orientations
+                before, after, match = after[::-1], before[::-1], match[::-1]
+
+            all_orientations[i]["before"] = before
+            all_orientations[i]["match"] = match
+            all_orientations[i]["after"] = after
+            all_orientations[i]["full"] = before + match + after
+        
+        # Use the representations in all_orientations to calculate the 'average' GN for the cluster
+        # Align the representations on the match gene
+        frequency_position_list = [{} for _ in range(args.max_genes)]
+        for i in range(len(all_orientations)):
+            # Pad the representations with None to ensure they are all the same length, 
+            # ensure at least (max_genes - 1)/2 on each side of match
+            before = all_orientations[i]["before"].copy()
+            match = all_orientations[i]["match"].copy()
+            after = all_orientations[i]["after"].copy()
+
+            pivot_flag = False
+            for j in range(len(match)):
+                orientation = match[j]
+                if orientation == 0:
+                    pivot_flag = True
+                    continue
+
+                if not pivot_flag:
+                    before.append(orientation)
+                else:
+                    after = [orientation] + after
+            
+            while len(before) < (args.max_genes - 1)/2:
+                before = [None] + before
+            
+            while len(after) < (args.max_genes - 1)/2:
+                after = after + [None]
+            
+            full = before + [0] + after
+
+            all_orientations[i]["padded"] = full
+
+            for j in range(len(full)):
+                orientation = full[j]
+                if orientation is not None:
+                    if j not in frequency_position_list:
+                        frequency_position_list[j] = {}
+                    if orientation not in frequency_position_list[j]:
+                        frequency_position_list[j][orientation] = 1
+                    else:
+                        frequency_position_list[j][orientation] += 1
+                else:
+                    if "None" not in frequency_position_list[j]:
+                        frequency_position_list[j]["None"] = 1
+                    else:
+                        frequency_position_list[j]["None"] += 1
+        
+        # Get the most common orientations from frequency_position_list
+        max_orientations = []
+        for freqs in frequency_position_list:
+            max_orientation = None
+            max_freq = 0
+            for orientation in freqs.keys():
+                if freqs[orientation] > max_freq:
+                    max_orientation = orientation
+                    max_freq = freqs[orientation]
+                elif freqs[orientation] == max_freq:
+                    # Placeholder to handle edge case where there's a tie
+                    pass
+            max_orientations.append(max_orientation)
+
+        # # Testing        
+        # for i in range(len(all_orientations)):
+        #     print(all_orientations[i]["padded"])
+        # print(max_orientations)
+        # exit()
+
+        average_representations[str(score)] = {'avg_orientations': max_orientations, 'num_GNs': len(names), 'cluster': cluster}
+
+
+    # Sort the clusters based on scores
+    cluster_scores = sorted(cluster_scores, key=lambda x: x[1], reverse=True)
+
     # Make cluster directories and move GNs into their respective cluster directories
     #print("Current dir: %s" % getcwd())
     dir_header = args.out_name
@@ -366,7 +587,8 @@ def main():
     else:
         outdir = args.gn_dir
     counter = 0
-    for cluster in clusters:
+
+    for cluster, score in cluster_scores:
         counter += 1
         if c is not None:
             names = c.index_list_to_genbank(cluster)
@@ -374,8 +596,18 @@ def main():
             names = cluster
         cluster_dir = path.join(outdir, dir_header+"_cluster_"+str(counter))
         mkdir(cluster_dir)
+
         for gn in names:
+            # Move GN
             move(path.join(args.gn_dir, gn), path.join(cluster_dir, gn))
+        
+        # Output score
+        with open(path.join(cluster_dir, ".score.txt"), "w") as score_file:
+            score_file.write(str(score))
+
+        # Output average GN
+        average_gn = average_representations[str(score)]['avg_orientations']
+        generate_svg.create_svg_from_orientation(average_gn, path.join(cluster_dir, ".representation.svg"))
 
 
 main()

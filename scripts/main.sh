@@ -22,8 +22,8 @@ fi
 evalue=0.01
 num_iter=4
 num_flanking_genes=15
-pid_threshold=0.30
-length_threshold=0.20
+pid_threshold=30
+length_threshold=20
 out_location=$(pwd)
 out_tag=$(date +%j%M%H%S)
 tax_flag=false
@@ -67,8 +67,8 @@ while [[ $# -gt 0 ]]; do
       echo '  [-e][--evalue]                  E-value for psi-BLAST search. Default=0.01'
       echo '  [-h][--help]                    Prints this message.'
       echo '  [-i][--num_iter]                Number of psi-BLAST iterations. Default=4'
-      echo '  [-l][--length_threshold]        Length threshold for match filtering. Filters out match genomic neighbourhoods'
-      echo '                                    that are outside of +-length_threshold*query_length. Default=0.20'
+      echo '  [-l][--length_threshold]        Percentage length threshold for match filtering. Filters out match genomic neighbourhoods'
+      echo '                                    that are outside of +-length_threshold/100*query_length. Default=20'
       echo '  [-lf][--label_file_location]    Location of label match file containing query names, protein match accessions,'
       echo '                                   and e-values of the matches. Generated/updated by parse_psiblast_out.py. If'
       echo '                                   not specified, creates a new label file in out folder.'
@@ -78,7 +78,7 @@ while [[ $# -gt 0 ]]; do
       echo '                                    first three are the current day (001-365), and the next six are HHMMSS.'
       echo '  [-pid][--pid_threshold]         PID threshold for match filtering. Filters out match genomic neighbourhoods'
       echo '                                    that are less than pid_threshold identical. The default value is intended'
-      echo '                                    to filter matches as homologous or potentially homologous. Default=0.30'
+      echo '                                    to filter matches as homologous or potentially homologous. Default=30'
       echo '  [-tf][--tax_flag]               Only use this flag if the database being queried is the ncbi bacterial '
       echo '                                    database. If specified, will try to generate phylogenetic trees and pie '
       echo '                                    charts, which may crash the program if any other dataset is used. Outputs '
@@ -201,14 +201,14 @@ mkdir "$outdir"
 
 # Create log file
 logfile="$outdir"/log.txt
-touch $logfile
+touch "$logfile"
 
 echo "Starting..."
 echo "Starting..." > "$logfile"
 
 # Get the start time in ms
 start_time=$(date +%s%3N)
-echo "Start: $start_time" >> $logfile
+echo "Start: $start_time" >> "$logfile"
 
 # Run scripts
 cd "$outdir" || exit 1
@@ -216,16 +216,16 @@ cd "$outdir" || exit 1
 # Check if a query file was provided, if so, run PSI-BLASTs
 if [ ! -z ${query_file+x} ]; then
   echo "Query file: $(basename $query_file)"
-  echo "Query file: $(basename $query_file)" >> $logfile
+  echo "Query file: $(basename $query_file)" >> "$logfile"
   echo "Running PSI-BLASTs"
-  echo "Running PSI-BLASTs" >> $logfile
+  echo "Running PSI-BLASTs" >> "$logfile"
   "${script_dir}"run_psiblasts.sh "$database" "$query_file" "$evalue" "$num_iter"
 
   psi_blast_finish_time=$(date +%s%3N)
 
-  echo "PSI-BLASTs finished: $psi_blast_finish_time" >> $logfile
+  echo "PSI-BLASTs finished: $psi_blast_finish_time" >> "$logfile"
   echo "PSI-BLASTs finished: $psi_blast_finish_time"
-  echo "Time to run PSI-BLASTs: $((psi_blast_finish_time - start_time)) ms" >> $logfile
+  echo "Time to run PSI-BLASTs: $((psi_blast_finish_time - start_time)) ms" >> "$logfile"
   echo "Time to run PSI-BLASTs: $((psi_blast_finish_time - start_time)) ms"
 
   query_filename=$(basename "$query_file")
@@ -237,11 +237,11 @@ if [ -z ${label_file_location+x} ];
 then
   # Make sure no label file already exists
   if [ -f "$out_tag".label ]; then
-    echo "$out_tag.label already exists in output directory. Please specify a different label file location. Exiting..." >> $logfile
+    echo "$out_tag.label already exists in output directory. Please specify a different label file location. Exiting..." >> "$logfile"
     echo "$out_tag.label already exists in output directory. Please specify a different label file location. Exiting..."
     exit 1
   else
-    echo "No label file specified, creating new $out_tag.label in output directory." >> $logfile
+    echo "No label file specified, creating new $out_tag.label in output directory." >> "$logfile"
     echo "No label file specified, creating new $out_tag.label in output directory."
     touch "$out_tag".label
     label_file_location="$PWD/$out_tag.label"
@@ -249,14 +249,14 @@ then
 fi
 
 label_file_name=$(basename "$label_file_location")
-echo "Using $label_file_name as match gene labelling file." >> $logfile
+echo "Using $label_file_name as match gene labelling file." >> "$logfile"
 echo "Using $label_file_name as match gene labelling file."
 
 # Get relevant info from psiblast output (GBFF_NAME MATCH_ACCESSION QUERY_ACCESSION E_VALUE PID QUERY_LEN MATCH_LEN MATCH_LEN/QUERY_LEN)
 # Also updates the label file with new match data
-echo "Parsing PSI-BLAST output..." >> $logfile
+echo "Parsing PSI-BLAST output..." >> "$logfile"
 echo "Parsing PSI-BLAST output..."
-"${script_dir}"parse_psiblast_out.py "$psiblast_out_file" 
+"${script_dir}"parse_psiblast_out.py "$psiblast_out_file"
 
 # For each .parsed file in the current directory, run modify_label_file.py to update the label file with new match data
 num_matches=0
@@ -276,9 +276,9 @@ do
     mv "$file" "${filename%.parsed}"/
 
     # Generate genomic neighbourhoods for each file containing matches
-    echo "Creating GNs for $file" >> $logfile
+    echo "Creating GNs for $file" >> "$logfile"
     echo "Creating GNs for $file"
-    "${script_dir}"build_gn.py "${filename%.parsed}"/"$file" -d "$gbff" -o "${filename%.parsed}/" -n "$num_flanking_genes"
+    "${script_dir}"build_gn.py "${filename%.parsed}"/"$file" -d "$gbff" -o "${filename%.parsed}"/ -n "$num_flanking_genes"
 
     parsed_directories=("${parsed_directories[@]}" "${filename%.parsed}")
   fi
@@ -286,7 +286,7 @@ done
 
 # Check if queries had any matches, if not, exit
 if [[ $num_matches -eq 0 ]]; then
-  echo "No PSI-BLAST matches to any query. Exiting..." >> $logfile
+  echo "No PSI-BLAST matches to any query. Exiting..." >> "$logfile"
   echo "No PSI-BLAST matches to any query. Exiting..."
   exit 0
 fi
@@ -294,56 +294,96 @@ fi
 # Filter GNs based on size, PID, redundancy, kmer. Generate phylo data for each filtering step
 for dir in "${parsed_directories[@]}";
 do
+  # Utility: save path to ImportBLAST.pl
+  kt_import_blast="${script_dir}"Krona/KronaTools/scripts/ImportBLAST.pl
+
   # Generate phylo data for all of the GNs generated
-  # TODO: Fix the phylo script
-  "${script_dir}"generate_phylogeny_data.py "$dir" -n $(basename "$dir" | cut -f1 -d '.')_raw -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$dir"
+  "${script_dir}"generate_krona_plot.py "$psiblast_out_file" -o "$dir"/all.krona.html -k "$kt_import_blast"
+
+  echo "Filtering GNs for $dir and generating phylogeny data." >> "$logfile"
+  echo "Filtering GNs for $dir and generating phylogeny data."
 
   # Remove redundants based on aa-seq
   "${script_dir}"redundancy.py "$dir"
+
+  # Get names of .gb files left in current directory
+  gb_files=("$dir"/*.gb)
+
   # Generate phylo data for all the non-redundant GNs
-  "${script_dir}"generate_phylogeny_data.py "$dir" -n $(basename "$dir" | cut -f1 -d '.')_non_redundant -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$dir"
+  "${script_dir}"generate_krona_plot.py "$psiblast_out_file" "$gb_files" -o "$dir"/all_non_redundants.krona.html -k "$kt_import_blast"
 
   # Copy all GNs into new non-redundants directory
   mkdir "$dir"/all_non_redundants
   cp "$dir"/*.gb "$dir"/all_non_redundants
+
   # Run clustering on NR directory
-  "${script_dir}"find_clusters.py "$dir"/all_non_redundants "$(basename "$dir" | cut -f1 -d ".")_non_redundant"
+  "${script_dir}"find_clusters.py "$dir"/all_non_redundants "$(basename "$dir" | cut -f1 -d ".")_non_redundant" --max_genes $((2*$num_flanking_genes+1))
+
   # Run plotting on NR clusters
+  echo "Generating phylogeny data and clinker plots for all non-redundant clusters in $dir" >> "$logfile"
+  echo "Generating phylogeny data and clinker plots for all non-redundant clusters in $dir"
+
   if [[ $(ls "$dir"/all_non_redundants | wc -l) -gt 0 ]]; then
       for cluster_dir in "$dir"/all_non_redundants/*_cluster_*
         do
-        # Generate phylo data and clinker plots for each cluster in all_non_redundants
-          "${script_dir}"generate_phylogeny_data.py "$cluster_dir" -n $(basename "$cluster_dir") -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$cluster_dir"
+          # Generate phylo data and clinker plots for each cluster in all_non_redundants
+          gb_files=("$cluster_dir"/*.gb)
+
+          "${script_dir}"generate_krona_plot.py "$psiblast_out_file" "$gb_files" -o "$cluster_dir"/all_non_redundants.krona.html -k "$kt_import_blast"
+
           "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location"
+
+          mkdir "$cluster_dir"/genbank_files
+          mv "$cluster_dir"/*.gb "$cluster_dir"/genbank_files
         done
   fi
 
   # Split GNs into two directories based on PID (threshold = 30%)
-  "${script_dir}"pid_filter.py parsed_outs/"$(basename "$dir")" -f "$dir" -t "$pid_threshold"
-  for h in "$dir"/*homologous
+  "${script_dir}"pid_filter.py "$dir"/"$dir".parsed -f "$dir" -t "$pid_threshold"
+
+  for h in "$dir"/*PID*
   do
-    # Generate phylo data for both PID filtered directories
-    "${script_dir}"generate_phylogeny_data.py "$h" -n $(basename "$h") -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$h" 
+    # Generate Krona plots for both PID filtered directories
+    gb_files=("$h"/*.gb)
+
+    "${script_dir}"generate_krona_plot.py "$psiblast_out_file" "$gb_files" -o "$h"/$(basename "$h").krona.html -k "$kt_import_blast"
+
     # Split GNs into two directories based on size (within/outside 20% (default) query protein length)
-    "${script_dir}"size_filter.py parsed_outs/"$(basename "$dir")" -f "$h" -t "$length_threshold"
+    "${script_dir}"size_filter.py "$dir"/"$dir".parsed -f "$h" -t "$length_threshold"
+
     for s in "$h"/*size
     do
-      # Generate phylo data for both size filtered directories
-      "${script_dir}"generate_phylogeny_data.py "$s" -n $(basename "$s") -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$s"
+      # Generate Krona plots for both size filtered directories
+      gb_files=("$s"/*.gb)
+
+      "${script_dir}"generate_krona_plot.py "$psiblast_out_file" "$gb_files" -o "$s"/$(basename "$s").krona.html -k "$kt_import_blast"
+
       # Generate kmer clusters (second argument is for first part of cluster dir name)
-      "${script_dir}"find_clusters.py "$s" "$(basename "$s")"
+      "${script_dir}"find_clusters.py "$s" "$(basename "$s")" --max_genes $((2*$num_flanking_genes+1))
+
+      # If there are clusters, generate Krona and Clinker plots for each cluster
       if [[ $(ls "$s" | wc -l) -gt 0 ]]; then
+      echo "Generating Krona and Clinker plots for all clusters in $s" >> "$logfile"
+      echo "Generating Krona and Clinker plots for all clusters in $s"
+
       for cluster_dir in "$s"/*_cluster_*
         do
-          # Generate phylo data and clinker plots for each cluster
-          "${script_dir}"generate_phylogeny_data.py "$cluster_dir" -n $(basename "$cluster_dir") -dt $(echo "$gbff" | rev | cut -f2 -d '/' | rev | cut -f1 -d '_') -o "$cluster_dir"
+          # Generate Krona and Clinker plots for each cluster
+          gb_files=("$cluster_dir"/*.gb)
+
+          "${script_dir}"generate_krona_plot.py "$psiblast_out_file" "$gb_files" -o "$cluster_dir"/krona.html -k "$kt_import_blast"
+
           "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location"
+
+          mkdir "$cluster_dir"/genbank_files
+          mv "$cluster_dir"/*.gb "$cluster_dir"/genbank_files
         done
       fi
     done
   done
 done
 
+echo "Output to $outdir" >> "$logfile"
 echo "Output to $outdir"
 
 
