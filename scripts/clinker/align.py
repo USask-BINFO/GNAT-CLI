@@ -113,6 +113,7 @@ def compare_pairs(one, two):
 def compute_identity(alignment):
     """Calculates sequence identity/similarity of a BioPython alignment object."""
     # Aligned strings aren't stored separately, have to split
+    print(str(alignment).split("\n"))
     one, _, two, _ = str(alignment).split("\n")
     length = len(one)
 

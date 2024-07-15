@@ -18,6 +18,9 @@ if [[ $# -lt 1 ]]; then
   exit 1
 fi
 
+kt_import_blast="${script_dir}"Krona/KronaTools/scripts/ImportBLAST.pl
+echo $kt_import_blast
+
 # Assign default values to arguments in case they aren't provided
 evalue=0.01
 num_iter=4
@@ -220,6 +223,7 @@ if [ ! -z ${query_file+x} ]; then
   cd "$curr_dir" || exit 1
   cd "$(dirname "$query_file")" || exit 1
   query_file="$(pwd)"/"$(basename "$query_file")"
+  cd "$working_dir" || exit 1
 
   echo "Query file: $(basename $query_file)"
   echo "Query file: $(basename $query_file)" >> "$logfile"
@@ -236,13 +240,15 @@ if [ ! -z ${query_file+x} ]; then
 
   query_filename=$(basename "$query_file")
   psiblast_out_file="$outdir"/"${query_filename%.fasta}".out
-fi
-
-# Check if there was any PSI-BLAST output
-if [ ! -f "$psiblast_out_file" ]; then
-  echo "No PSI-BLAST matches to any query. Exiting..." >> "$logfile"
-  echo "No PSI-BLAST matches to any query. Exiting..."
-  exit 0
+else
+  if [ ! -z $psiblast_out_file ]; then
+    # Get the absolute path to the PSI-BLAST output file if one was provided instead of a query
+    working_dir=$(pwd)
+    cd "$curr_dir" || exit 1
+    cd "$(dirname "$psiblast_out_file")" || exit 1
+    psiblast_out_file="$(pwd)"/"$(basename "$psiblast_out_file")"
+    cd "$working_dir" || exit 1
+  fi
 fi
 
 # Create and assign label_file_location if not specified
@@ -297,7 +303,7 @@ do
   fi
 done
 
-# Check if there are any matches after filtering, if not, exit. (I don't think this check is necessary, but leaving it in just in case)
+# Check if there are any matches after filtering, if not, exit.
 if [[ $num_matches -eq 0 ]]; then
   echo "No non-redundant PSI-BLAST matches to any query. Exiting..." >> "$logfile"
   echo "No non-redundant PSI-BLAST matches to any query. Exiting..."
