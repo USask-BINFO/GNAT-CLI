@@ -112,10 +112,64 @@ def compare_pairs(one, two):
 
 def compute_identity(alignment):
     """Calculates sequence identity/similarity of a BioPython alignment object."""
-    # Aligned strings aren't stored separately, have to split
-    print(str(alignment).split("\n"))
-    one, _, two, _ = str(alignment).split("\n")
+    # BioPython changed the str() in new versions (>py38 at least)
+    # Where the output used to look like:
+    #     MSNTFGFEDAIIDLERLSTRVDSIQKKIYE--EAIEIRDDARNIATGLGLHKSGKGVSGIEIEKVSNGVEIGWMNRPNFHLYFHEFGFHATGRKSGKRYSSRSSKGKRKRKYKKGTTYIPPKPHLRPAFDRGKEKFE----------------NNIKKFVEGE----------------
+    #     |---------------------|....|.|--|...|-----|||.|..--------......|....|------------..|.--------------..|.|..|..|..|....|....|-------|..|..|----------------|.....||..----------------
+    #     M---------------------SVKSRIFEALEPLNI-----NIAHGYS--------DDMTLPKIITNV------------ISHR--------------AIRLSDRKHYRHVKYQISYFDKVP-------RDVEDDEILISIMNALENANLVTNEWTEIVEPDEDTEETIFHYILEVCI
+    #
+    # It is now separated into several lines of max 80 columns:
+        # "The first 10 columns show the (possibly truncated) sequence name,
+        # which may be the id attribute of a SeqRecord, or otherwise 'target'
+        # or 'query' for pairwise alignments.
+        # The next 10 columns show the sequence coordinate, using zero-based
+        # counting as usual in Python.
+        # The remaining 60 columns shown the sequence, using dashes to represent
+        # gaps.
+        # At the end of the alignment, the end coordinates are shown on the right
+        # of the sequence, again in zero-based coordinates.
+
+        # Pairwise alignments have an additional line between the two sequences
+        # showing whether the sequences match ('|') or mismatch ('.'), or if
+        # there is a gap ('-').
+        # The coordinates shown for this line are the column indices, which can
+        # be useful when extracting a subalignment."
+    # So like this:
+        # target            0 MSNTFGFEDAIIDLERLSTRVDSIQKKIYE--EAIEIRDDARNIATGLGLHKSGKGVSGI
+        #                   0 |---------------------|....|.|--|...|-----|||.|..--------...
+        # query             0 M---------------------SVKSRIFEALEPLNI-----NIAHGYS--------DDM
+
+        # target           58 EIEKVSNGVEIGWMNRPNFHLYFHEFGFHATGRKSGKRYSSRSSKGKRKRKYKKGTTYIP
+        #                  60 ...|....|------------..|.--------------..|.|..|..|..|....|..
+        # query            26 TLPKIITNV------------ISHR--------------AIRLSDRKHYRHVKYQISYFD
+
+        # target          118 PKPHLRPAFDRGKEKFE----------------NNIKKFVEGE----------------
+        #                 120 ..|-------|..|..|----------------|.....||..----------------
+        # query            60 KVP-------RDVEDDEILISIMNALENANLVTNEWTEIVEPDEDTEETIFHYILEVCI
+
+        # target          145
+        #                 179
+        # query           112
+    # So I have to modify the Clinker code accordingly...
+
+    # ORIGINAL CLINKER CODE:
+    # # Aligned strings aren't stored separately, have to split
+    # one, _, two, _ = str(alignment).split("\n")
+    # length = len(one)
+
+    # MY MODIFICATION:
+    alignment_string = str(alignment).split("\n")
+    one, two = "", ""
+    for line_index in range(len(alignment_string)):
+        if line_index % 4 == 0:
+            # Target line
+            one += alignment_string[line_index][20:].strip()
+        elif line_index % 4 == 2:
+            # Query line
+            two += alignment_string[line_index][20:].strip()
+    
     length = len(one)
+    # MODIFICATION OVER
 
     # Amino acid similarity groups
     similar_acids = [
