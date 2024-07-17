@@ -38,4 +38,3 @@ if [[ ${#POSITIONAL_ARGS[@]} -lt 1 ]]; then
 fi
 
 python "$(echo "${BASH_SOURCE[0]}" | rev | cut -d'/' -f2- | rev)"/clinker/main.py "${POSITIONAL_ARGS[@]}" -p "$PLOTNAME" -lf "$LABELFILE"
-
