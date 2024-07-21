@@ -28,6 +28,10 @@ out_location=$(pwd)
 out_tag=$(date +%j%M%H%S)
 tax_flag=false
 
+# Default loading filename (overwritten when called by GNAT with -gl)
+log_filename="log.txt"
+gnat_flag='false'
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -134,6 +138,12 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
+    -gf|--gnat_flag)
+      # Only to be used when calling within GNAT to make the loading file
+      log_filename=".loading_info.txt"
+      gnat_flag='true'
+      shift
+      ;;
     "")
       shift
       ;;
@@ -185,22 +195,32 @@ database=$(cd "$database_root"/"$org_name"db || exit; pwd; cd "$curr_dir" || exi
 echo "BlastDB found!"
 gbff=$(cd "$database_root"/"$org_name"_genomes/gbff || exit; pwd; cd "$curr_dir" || exit)
 echo "GBFFs found!"
-out_location=$(cd "$out_location" || exit; pwd; cd "$curr_dir" || exit)
 
-outdir="$out_location"/gnat_out_"$out_tag"
+if [ "$gnat_flag" == 'false' ]; then
+  out_location=$(cd "$out_location" || exit; pwd; cd "$curr_dir" || exit)
 
-# Check if outdir exists, if so, exit
-if [ -d "$outdir" ]; then
-  echo "Error: directory $outdir exists. Specify a different -ot or -ol. Exiting...";
-  exit 1;
+  outdir="$out_location"/gnat_out_"$out_tag"
+
+  # Check if outdir exists, if so, exit
+  if [ -d "$outdir" ]; then
+    echo "Error: directory $outdir exists. Specify a different -ot or -ol. Exiting...";
+    exit 1;
+  fi
+
+  # Create the output directory
+  mkdir "$outdir"
+else
+  # If running on GNAT, outdir already exists
+  outdir="$out_location"/"$out_tag"
+
+  if [ ! -d "$outdir" ]; then
+    echo "Error: job directory $outdir doesn't exist. This shouldn't be possible..."
+    exit 1;
+  fi
 fi
 
-# Create the output directory
-mkdir "$outdir"
-
-
 # Create log file
-logfile="$outdir"/log.txt
+logfile="$outdir"/"$log_filename"
 touch "$logfile"
 
 echo "Starting..."
@@ -216,11 +236,16 @@ cd "$outdir" || exit 1
 # Check if a query file was provided, if so, run PSI-BLASTs
 if [ ! -z ${query_file+x} ]; then
   # Get the absolute path to the query_file
+  # TODO GET ABSOLUTE PATHING TO WORK FOR GNAT AND ACRVIS VERSIONS (breaks when dirname $query_file is '.')
   working_dir=$(pwd)
   cd "$curr_dir" || exit 1
   cd "$(dirname "$query_file")" || exit 1
   query_file="$(pwd)"/"$(basename "$query_file")"
   cd "$working_dir" || exit 1
+
+  if [ "$gnat_flag" == 'true' ]; then
+    query_file="$outdir"/"$(basename $query_file)"
+  fi
 
   echo "Query file: $(basename $query_file)"
   echo "Query file: $(basename $query_file)" >> "$logfile"
@@ -245,6 +270,11 @@ else
     cd "$(dirname "$psiblast_out_file")" || exit 1
     psiblast_out_file="$(pwd)"/"$(basename "$psiblast_out_file")"
     cd "$working_dir" || exit 1
+
+    if [ "$gnat_flag" == 'true' ]; then
+      psiblast_out_file="$outdir"/"$(basename $psiblast_out_file)"
+    fi
+
   fi
 fi
 
