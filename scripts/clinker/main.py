@@ -25,7 +25,7 @@ from classes import find_files, parse_files, labelfilelocation
 __version__ = "0.0.23"
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="[%(asctime)s] %(levelname)s - %(message)s",
     datefmt="%H:%M:%S"
 )
@@ -330,7 +330,7 @@ def main():
     labelfilelocation[0] = args.labelling_file
     lf = args.labelling_file
     if lf == "":
-        LOG.info("No labelling file provided. Psi-BLAST matches will not be labelled.")
+        LOG.warn("No labelling file provided. Psi-BLAST matches will not be labelled.")
     else:
         if not osPath.isfile(lf):
             LOG.warn("Warning: '%s' is not recognized as a file. Psi-BLAST matches will not be labelled." % lf)
