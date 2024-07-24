@@ -356,7 +356,7 @@ do
   gb_files=("$dir"/*.gb)
 
   # Generate phylo data for all the non-redundant GNs
-  if [ "${#gb_files[@]}" -gt 1 ]; then
+  if [ "${#gb_files[@]}" -gt 0 ]; then
     echo "${gb_files[*]}" >> $logfile
     "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$dir"/all_non_redundants.krona.html
   fi
@@ -378,7 +378,7 @@ do
           # Generate phylo data and clinker plots for each cluster in all_non_redundants
           gb_files=("$cluster_dir"/*.gb)
 
-          if [ "${#gb_files[@]}" -gt 1 ]; then
+          if [ "${#gb_files[@]}" -gt 0 ]; then
             "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$cluster_dir"/all_non_redundants.krona.html
           fi
 
@@ -397,7 +397,7 @@ do
     # Generate Krona plots for both PID filtered directories
     gb_files=("$h"/*.gb)
 
-    if [ "${#gb_files[@]}" -gt 1 ]; then
+    if [ "${#gb_files[@]}" -gt 0 ]; then
       "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$h"/$(basename "$h").krona.html
     fi
 
@@ -409,7 +409,7 @@ do
       # Generate Krona plots for both size filtered directories
       gb_files=("$s"/*.gb)
 
-      if [ "${#gb_files[@]}" -gt 1 ]; then
+      if [ "${#gb_files[@]}" -gt 0 ]; then
         "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$s"/$(basename "$s").krona.html
       fi
 
@@ -426,7 +426,7 @@ do
           # Generate Krona and Clinker plots for each cluster
           gb_files=("$cluster_dir"/*.gb)
 
-          if [ "${#gb_files[@]}" -gt 1 ]; then
+          if [ "${#gb_files[@]}" -gt 0 ]; then
             "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$cluster_dir"/$(basename "$cluster_dir").krona.html
           fi
 
