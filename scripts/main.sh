@@ -340,8 +340,11 @@ fi
 # Filter GNs based on size, PID, redundancy, kmer. Generate phylo data for each filtering step
 for dir in "${parsed_directories[@]}";
 do
+  # Get the name of the parsed psiblast output file (only one per $dir)
+  parsed_psiblast_out_file=$(find "$dir" -name '*.parsed' -print -quit)
+
   # Generate phylo data for all of the GNs generated
-  "${script_dir}"generate_krona_plot.py "$psiblast_out_file" -o "$dir"/all.krona.html
+  "${script_dir}"generate_krona_plot.py "$psiblast_out_file" -o "$dir"/all.krona.html --raw
 
   echo "Filtering GNs for $dir and generating phylogeny data." >> "$logfile"
   echo "Filtering GNs for $dir and generating phylogeny data."
@@ -353,7 +356,10 @@ do
   gb_files=("$dir"/*.gb)
 
   # Generate phylo data for all the non-redundant GNs
-  "${script_dir}"generate_krona_plot.py "$psiblast_out_file" "$gb_files" -o "$dir"/all_non_redundants.krona.html
+  if [ "${#gb_files[@]}" -gt 1 ]; then
+    echo "${gb_files[*]}" >> $logfile
+    "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$dir"/all_non_redundants.krona.html
+  fi
 
   # Copy all GNs into new non-redundants directory
   mkdir "$dir"/all_non_redundants
@@ -372,7 +378,9 @@ do
           # Generate phylo data and clinker plots for each cluster in all_non_redundants
           gb_files=("$cluster_dir"/*.gb)
 
-          "${script_dir}"generate_krona_plot.py "$psiblast_out_file" "$gb_files" -o "$cluster_dir"/all_non_redundants.krona.html
+          if [ "${#gb_files[@]}" -gt 1 ]; then
+            "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$cluster_dir"/all_non_redundants.krona.html
+          fi
 
           "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location"
 
@@ -389,7 +397,9 @@ do
     # Generate Krona plots for both PID filtered directories
     gb_files=("$h"/*.gb)
 
-    "${script_dir}"generate_krona_plot.py "$psiblast_out_file" "$gb_files" -o "$h"/$(basename "$h").krona.html
+    if [ "${#gb_files[@]}" -gt 1 ]; then
+      "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$h"/$(basename "$h").krona.html
+    fi
 
     # Split GNs into two directories based on size (within/outside 20% (default) query protein length)
     "${script_dir}"size_filter.py "$dir"/"$dir".parsed -f "$h" -t "$length_threshold"
@@ -399,7 +409,9 @@ do
       # Generate Krona plots for both size filtered directories
       gb_files=("$s"/*.gb)
 
-      "${script_dir}"generate_krona_plot.py "$psiblast_out_file" "$gb_files" -o "$s"/$(basename "$s").krona.html
+      if [ "${#gb_files[@]}" -gt 1 ]; then
+        "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$s"/$(basename "$s").krona.html
+      fi
 
       # Generate kmer clusters (second argument is for first part of cluster dir name)
       "${script_dir}"find_clusters.py "$s" "$(basename "$s")" --max_genes $((2*$num_flanking_genes+1))
@@ -414,7 +426,9 @@ do
           # Generate Krona and Clinker plots for each cluster
           gb_files=("$cluster_dir"/*.gb)
 
-          "${script_dir}"generate_krona_plot.py "$psiblast_out_file" "$gb_files" -o "$cluster_dir"/$(basename "$cluster_dir").krona.html
+          if [ "${#gb_files[@]}" -gt 1 ]; then
+            "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$cluster_dir"/$(basename "$cluster_dir").krona.html
+          fi
 
           "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location"
 
@@ -426,7 +440,7 @@ do
   done
 done
 
-echo "Output to $outdir" >> "$logfile"
-echo "Output to $outdir"
+echo "Output with out tag $outtag" >> "$logfile"
+echo "Output with out tag $outtag"
 
 
