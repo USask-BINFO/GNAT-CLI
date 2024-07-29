@@ -225,7 +225,7 @@ function plot(data) {
   const div = d3.select("#plot")
   const chart = ClusterMap.ClusterMap()
     .config({
-      scaleFactor: 80,  // Modified, used to be 30
+      scaleFactor: 50,  // Modified, used to be 30
       cluster: {
         spacing: 50,
         alignLabels: true,
@@ -564,7 +564,7 @@ function plot(data) {
   update({gene: {label: {show: true}}}); // Gene labels on by default
   d3.selectAll("text.geneLabel").each(d => d.label = d.names["psi_blast_match"] ? d.names["psi_blast_match"] : d.names["clear"]); update({}); // Default label psi_blast_match if present, else clear (" ")
   update({link: {show: false}}) // Default show links off
-  update({plot: {scaleFactor: 80}}) // Default scale 80
+  update({plot: {scaleFactor: 50}}) // Default scale 50
   update({gene: {label: {rotation: 45}}}) // Default gene label angle = 45 degrees
   }
   set_defaults()
@@ -609,7 +609,7 @@ function updatePlot() {
   // Not used, just in case I need to change something in data and update the plot to reflect the change
   d3.select("#plot").call(ClusterMap.ClusterMap()
   .config({
-    scaleFactor: 80,  // Modified, used to be 30
+    scaleFactor: 50,  // Modified, used to be 30
     cluster: {
       spacing: 50,
       alignLabels: true,
