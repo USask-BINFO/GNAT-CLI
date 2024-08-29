@@ -182,7 +182,9 @@ def clinker(
                 with open(output, "w") as fp:
                     fp.write(summary)
         else:
-            print(summary)
+            # Not printing summaries to prevent cluttering the terminal if LOG level isn't set to INFO
+            if LOG.level == logging.INFO:
+                print(summary)
         if matrix_out:
             LOG.info("Writing synteny matrix to: %s", matrix_out)
             matrix = globaligner.format_matrix(normalise=True, as_distance=True)
