@@ -5,12 +5,13 @@ modify the n param in find_cluster()
 """
 
 from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
 import gzip
 import argparse
 from os import path
 
 parser = argparse.ArgumentParser("Create genomic neighbourhoods from tab-delimited psi-BLAST output files.")
-parser.add_argument("parsed_out", type=str, help="Tab delimited psi-BLAST output file.")
+parser.add_argument("parsed_out", type=str, help="Tab delimited parsed psi-BLAST output file.")
 parser.add_argument("-n", help="Number of genes upstream/downstream to be added to create genomic neighbourhoods.",
                     type=int)
 parser.add_argument("-d", "--database", help="Path to database folder containing .gbff files (normally called gbff/",
@@ -18,6 +19,15 @@ parser.add_argument("-d", "--database", help="Path to database folder containing
 parser.add_argument("-o", "--out", help="Desired output location (data/query_name/)", required=True)
 
 args = parser.parse_args()
+
+# class Args:
+#     def __init__(self):
+#         self.parsed_out = "/home/njt694/gnat_pipe_testing/broken.parsed"
+#         self.n = 15
+#         self.database = "/home/njt694/gnat_pipe_testing/gbff"
+#         self.out = "/home/njt694/gnat_pipe_testing/testgn"
+
+# args = Args()
 
 filename = path.basename(args.parsed_out)
 
@@ -50,6 +60,52 @@ for line in lines:
         genomes.append(line.split()[0])
         accessions.append(line.split()[1])
         e_values.append(float(line.split()[2]))
+
+def build_gn_from_features(original_record, feature_list):
+    """
+    Build a new GenBank record from a list of features extracted by find_cluster().
+
+    :param original_record: Original SeqRecord to use for sequence data and annotations.
+    :param feature_list: List of SeqFeatures to include in the new record.
+    :return: New SeqRecord with the specified gene features. 
+    """
+    if not feature_list:
+        raise ValueError("No features to build Genomic Neighbourhood from.")
+    
+    # Get start and end positions of the new record
+    start, end = feature_list[0].location.start, feature_list[-1].location.end
+
+    # Loop to ensure there aren't overlapping genes that go further than the first/last in the list
+    for feature in feature_list:
+        if feature.location.start < start:
+            start = feature.location.start
+        if feature.location.end > end:
+            end = feature.location.end
+    
+    # Extract the sequence from the original record
+    new_seq = original_record.seq[start:end]
+
+    # Create a new record with the extracted sequence and features
+    new_record = SeqRecord(
+        seq=new_seq,
+        id=original_record.id,
+        name=original_record.name,
+        description=original_record.description,
+        features=feature_list,
+        annotations=original_record.annotations
+        # annotations={"taxonomy": original_record.annotations["taxonomy"],
+                    #  "organism": original_record.annotations["organism"]}
+    )
+
+    new_record.annotations["taxonomy"] = original_record.annotations["taxonomy"]
+    new_record.annotations["organism"] = original_record.annotations["organism"]
+
+    # Adjust the location of the features to match the new sequence
+    for feature in new_record.features:
+        feature.location = feature.location._shift(-start)
+
+    return new_record
+
 
 
 def find_cluster(genomename, accessionpos, n):
@@ -91,20 +147,20 @@ def find_cluster(genomename, accessionpos, n):
                             if feature == record.features[-1]:
                                 print("Reached end of record")  # no more downstream genes in record
                                 n_upstream_plusmatch.extend(n_downstream)  # combine the two lists into one
-                                gene_cluster = record_match_foundin[(n_upstream_plusmatch[0].location.start): (
-                                    n_upstream_plusmatch[-1].location.end)]
-                                gene_cluster.annotations["taxonomy"] = record_match_foundin.annotations["taxonomy"]
-                                gene_cluster.annotations["organism"] = record_match_foundin.annotations["organism"]
-                                return gene_cluster
+                                # gene_cluster = record_match_foundin[(n_upstream_plusmatch[0].location.start): (
+                                #     n_upstream_plusmatch[-1].location.end)]
+                                # gene_cluster.annotations["taxonomy"] = record_match_foundin.annotations["taxonomy"]
+                                # gene_cluster.annotations["organism"] = record_match_foundin.annotations["organism"]
+                                return build_gn_from_features(record_match_foundin, n_upstream_plusmatch)
 
                         # n in downstream list, create genbank cluster and return
                         else:
                             n_upstream_plusmatch.extend(n_downstream)
-                            gene_cluster = record_match_foundin[(n_upstream_plusmatch[0].location.start): (
-                                n_upstream_plusmatch[-1].location.end)]
-                            gene_cluster.annotations["taxonomy"] = record_match_foundin.annotations["taxonomy"]
-                            gene_cluster.annotations["organism"] = record_match_foundin.annotations["organism"]
-                            return gene_cluster
+                            # gene_cluster = record_match_foundin[(n_upstream_plusmatch[0].location.start): (
+                            #     n_upstream_plusmatch[-1].location.end)]
+                            # gene_cluster.annotations["taxonomy"] = record_match_foundin.annotations["taxonomy"]
+                            # gene_cluster.annotations["organism"] = record_match_foundin.annotations["organism"]
+                            return build_gn_from_features(record_match_foundin, n_upstream_plusmatch)
 
                     # if a protein_id exists and it matches the accession number of the match
                     if 'protein_id' in feature.qualifiers and feature.qualifiers['protein_id'][0] == accessionpos:
@@ -114,21 +170,21 @@ def find_cluster(genomename, accessionpos, n):
                         # if the match is the last feature in the record, return the cluster
                         if feature == record.features[-1]:
                             n_upstream_plusmatch.extend(n_downstream)
-                            gene_cluster = record_match_foundin[(n_upstream_plusmatch[0].location.start): (
-                                n_upstream_plusmatch[-1].location.end)]
-                            gene_cluster.annotations["taxonomy"] = record_match_foundin.annotations["taxonomy"]
-                            gene_cluster.annotations["organism"] = record_match_foundin.annotations["organism"]
+                            # gene_cluster = record_match_foundin[(n_upstream_plusmatch[0].location.start): (
+                            #     n_upstream_plusmatch[-1].location.end)]
+                            # gene_cluster.annotations["taxonomy"] = record_match_foundin.annotations["taxonomy"]
+                            # gene_cluster.annotations["organism"] = record_match_foundin.annotations["organism"]
                             print("Match in last Feature")
-                            return gene_cluster
+                            return build_gn_from_features(record_match_foundin, n_upstream_plusmatch)
 
                 elif feature.type != 'CDS' and feature == record.features[-1] and matchreached:
                     n_upstream_plusmatch.extend(n_downstream)  # combine the two lists into one
-                    gene_cluster = record_match_foundin[
-                                   (n_upstream_plusmatch[0].location.start): (n_upstream_plusmatch[-1].location.end)]
-                    gene_cluster.annotations["taxonomy"] = record_match_foundin.annotations["taxonomy"]
-                    gene_cluster.annotations["organism"] = record_match_foundin.annotations["organism"]
+                    # gene_cluster = record_match_foundin[
+                    #                (n_upstream_plusmatch[0].location.start): (n_upstream_plusmatch[-1].location.end)]
+                    # gene_cluster.annotations["taxonomy"] = record_match_foundin.annotations["taxonomy"]
+                    # gene_cluster.annotations["organism"] = record_match_foundin.annotations["organism"]
                     print("Match in last CDS")
-                    return gene_cluster
+                    return build_gn_from_features(record_match_foundin, n_upstream_plusmatch)
 
 
 # Main
