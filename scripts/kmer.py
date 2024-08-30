@@ -1,5 +1,7 @@
 import numpy as np
 
+# modification of kmer to user AA instead of DNA from https://github.com/MindAI/kmer/blob/master/kmer.py
+
 class kmer_featurization:
 
   def __init__(self, k):
@@ -15,7 +17,7 @@ class kmer_featurization:
 
   def obtain_kmer_feature_for_a_list_of_sequences(self, seqs, write_number_of_occurrences=False):
     """
-    Given a list of m DNA sequences, return a 2-d array with shape (m, 4**k) for the 1-hot representation of the kmer features.
+    Given a list of m AA sequences, return a 2-d array with shape (m, 4**k) for the 1-hot representation of the kmer features.
     Args:
       write_number_of_occurrences:
         a boolean. If False, then in the 1-hot representation, the percentage of the occurrence of a kmer will be recorded; otherwise the number of occurrences will be recorded. Default False.
@@ -31,10 +33,10 @@ class kmer_featurization:
 
   def obtain_kmer_feature_for_one_sequence(self, seq, write_number_of_occurrences=False):
     """
-    Given a DNA sequence, return the 1-hot representation of its kmer feature.
+    Given a AA sequence, return the 1-hot representation of its kmer feature.
     Args:
       seq:
-        a string, a DNA sequence
+        a string, an AA sequence
       write_number_of_occurrences:
         a boolean. If False, then in the 1-hot representation, the percentage of the occurrence of a kmer will be recorded; otherwise the number of occurrences will be recorded. Default False.
     """

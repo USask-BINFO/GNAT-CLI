@@ -70,6 +70,7 @@ class Cluster:
             estimator = KMeans(n_clusters=k, algorithm="lloyd", n_init=10) # Used to be algorithm="full" and no n_init, but prev n_init default was 10 so keeping like this
             labels = estimator.fit_predict(matrix)
         except ConvergenceWarning:
+            # If clustering fails, arbitrarily split the matrix into k parts
             indices = [i for i in range(len(matrix))]
 
             def sub_split(a, n):
