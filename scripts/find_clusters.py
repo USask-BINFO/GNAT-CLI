@@ -528,21 +528,45 @@ def main():
                 else:
                     after = [orientation] + after
             
-            while len(before) < (args.max_genes - 1)/2:
-                before = [None] + before
+            # Ensure before and after have exactly n elements
+            # Pads with None if less than n
+            # Truncates furthest element if greater than n
+            #   Only ever exceeds n if the edge gene has another gene overlapping it (e.g. some viral genomes)
+            flanking_n = (args.max_genes - 1)/2
+            while len(before) != flanking_n:
+                if len(before) < flanking_n:
+                    before = [None] + before
+                elif len(before) > flanking_n:
+                    before = before[1:]
             
-            while len(after) < (args.max_genes - 1)/2:
-                after = after + [None]
+            while len(after) != flanking_n:
+                if len(after) < flanking_n:
+                    after = after + [None]
+                elif len(after) > flanking_n:
+                    after = after[:-1]
             
+            # Concatenation of the max-sized flanks plus the match
             full = before + [0] + after
 
             all_orientations[i]["padded"] = full
 
+            # Get the frequencies of the orientation at each possible position in the GNs to calculate the averages
             for j in range(len(full)):
                 orientation = full[j]
                 if orientation is not None:
                     if j not in frequency_position_list:
                         frequency_position_list[j] = {}
+                        # try:
+                        #     frequency_position_list[j] = {}
+                        # except IndexError:
+                        #     print(f"j: {j}")
+                        #     print(f"len(frequency_position_list): {len(frequency_position_list)}")
+                        #     print(f"len(full): {len(full)}")
+                        #     print(f"frequency_position_list: {frequency_position_list}")
+                        #     print(f"full: {full}")
+                        #     print(f"all_orientations[i]: {all_orientations[i]}")
+                        #     frequency_position_list[j] = {}
+                        #     exit()
                     if orientation not in frequency_position_list[j]:
                         frequency_position_list[j][orientation] = 1
                     else:
