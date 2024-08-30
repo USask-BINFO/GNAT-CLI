@@ -156,7 +156,7 @@ importblastpl_path = os.path.join(krona_path, "ImportBLAST.pl")
 # Run Krona on the temp file
 subprocess.run([importblastpl_path, 
                temp_name,
-               "-o", output])
+               "-o", output], stdout=subprocess.DEVNULL)
 
 # Remove the temp file
 os.remove(temp_name)
