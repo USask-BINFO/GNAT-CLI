@@ -25,7 +25,7 @@ from classes import find_files, parse_files, labelfilelocation
 __version__ = "0.0.23"
 
 logging.basicConfig(
-    level=logging.WARNING,
+    level=logging.ERROR,
     format="[%(asctime)s] %(levelname)s - %(message)s",
     datefmt="%H:%M:%S"
 )
