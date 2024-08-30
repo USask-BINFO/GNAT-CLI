@@ -14,6 +14,7 @@
 
 EVAL=0.01
 NUM_ITER=4
+OUT_TAG=""
 
 i=1
 while [[ $# -gt 0 ]]; do
@@ -34,14 +35,18 @@ while [[ $# -gt 0 ]]; do
       NUM_ITER=$1
       shift
       ;;
+    5)
+      OUT_TAG=$1
+      shift
+      ;;
   esac
   i=$((i+1))
 done
 
-echo "PSI-BLAST Query: $(basename $FASTAFILE)"
+echo "[ $OUT_TAG ] PSI-BLAST Query: $(basename $FASTAFILE)"
 while read -r db_name;
 do
-  echo "Querying: $db_name"
+  echo "[ $OUT_TAG ] Querying: $db_name"
   psiblast -query "$FASTAFILE" -db "$DBDIR/$db_name" -num_iterations "$NUM_ITER" -num_threads 4 -outfmt "6 qacc sacc pident qlen slen evalue" -evalue "$EVAL" > outfile.out;
 done < "$DBDIR"/all_pal_names.txt
 

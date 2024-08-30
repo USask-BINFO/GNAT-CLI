@@ -121,7 +121,7 @@ def find_cluster(genomename, accessionpos, n):
                         if len(n_downstream) < n:
                             n_downstream.append(feature)
                             if feature == record.features[-1]:
-                                print("Reached end of record")  # no more downstream genes in record
+                                # print("Reached end of record")  # no more downstream genes in record
                                 n_upstream_plusmatch.extend(n_downstream)  # combine the two lists into one
                                 return build_gn_from_features(record_match_foundin, n_upstream_plusmatch)
 
@@ -138,17 +138,17 @@ def find_cluster(genomename, accessionpos, n):
                         # if the match is the last feature in the record, return the cluster
                         if feature == record.features[-1]:
                             n_upstream_plusmatch.extend(n_downstream)
-                            print("Match in last Feature")
+                            # print("Match in last Feature")
                             return build_gn_from_features(record_match_foundin, n_upstream_plusmatch)
 
                 elif feature.type != 'CDS' and feature == record.features[-1] and matchreached:
                     n_upstream_plusmatch.extend(n_downstream)  # combine the two lists into one
-                    print("Match in last CDS")
+                    # print("Match in last CDS")
                     return build_gn_from_features(record_match_foundin, n_upstream_plusmatch)
 
 
 # Main
-print("Creating Clusters for " + args.parsed_out + " as Input file...")
+# print("Creating Clusters for " + args.parsed_out + " as Input file...")
 
 # for each genome in the tab delimited file of matches, find the cluster create genbank file
 for each in range(len(genomes)):
@@ -158,7 +158,7 @@ for each in range(len(genomes)):
     genbankfile_matchname = Gene_cluster.description.replace(" ", "_").replace(":", "").replace(",", "").replace("|", "_")
     #print(Gene_cluster)
     # print(genbankfile_matchname)
-    print("%i GNs generated. Total=%s" % (each+1, str(len(genomes))))
+    # print("%i GNs generated. Total=%s" % (each+1, str(len(genomes))))
 
     if len(genbankfile_matchname) > 150:
         genbankfile_matchname = genbankfile_matchname[:137] + "_trimmed_name"

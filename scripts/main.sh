@@ -186,15 +186,15 @@ else
 fi
 
 # Make sure paths are absolute, find necessary database directories
-echo "Checking paths..."
+echo "[ $out_tag ] Checking paths..."
 database_root=$(cd "$database"/ || exit; pwd; cd "$curr_dir" || exit)
 org_name_db=$(basename "$database")
 org_name="${org_name_db%_db}"
 
 database=$(cd "$database_root"/"$org_name"db || exit; pwd; cd "$curr_dir" || exit)
-echo "BlastDB found!"
+echo "[ $out_tag ] BlastDB found!"
 gbff=$(cd "$database_root"/"$org_name"_genomes/gbff || exit; pwd; cd "$curr_dir" || exit)
-echo "GBFFs found!"
+echo "[ $out_tag ] GBFFs found!"
 
 if [ "$gnat_flag" == 'false' ]; then
   out_location=$(cd "$out_location" || exit; pwd; cd "$curr_dir" || exit)
@@ -203,7 +203,7 @@ if [ "$gnat_flag" == 'false' ]; then
 
   # Check if outdir exists, if so, exit
   if [ -d "$outdir" ]; then
-    echo "Error: directory $outdir exists. Specify a different -ot or -ol. Exiting...";
+    echo "[ $out_tag ] Error: directory $outdir exists. Specify a different -ot or -ol. Exiting...";
     exit 1;
   fi
 
@@ -214,7 +214,7 @@ else
   outdir="$out_location"/"$out_tag"
 
   if [ ! -d "$outdir" ]; then
-    echo "Error: job directory $outdir doesn't exist. This shouldn't be possible..."
+    echo "[ $out_tag ] Error: job directory $outdir doesn't exist. This shouldn't be possible..."
     exit 1;
   fi
 fi
@@ -223,12 +223,12 @@ fi
 logfile="$outdir"/"$log_filename"
 touch "$logfile"
 
-echo "Starting..."
+echo "[ $out_tag ] Starting..."
 echo "Starting..." > "$logfile"
 
 # Get the start time in ms
 start_time=$(date +%s%3N)
-echo "Start: $start_time" >> "$logfile"
+echo "[ $out_tag ] Start: $start_time" >> "$logfile"
 
 # Run scripts
 cd "$outdir" || exit 1
@@ -247,18 +247,18 @@ if [ ! -z ${query_file+x} ]; then
     query_file="$outdir"/"$(basename $query_file)"
   fi
 
-  echo "Query file: $(basename $query_file)"
+  echo "[ $out_tag ] Query file: $(basename $query_file)"
   echo "Query file: $(basename $query_file)" >> "$logfile"
-  echo "Running PSI-BLASTs"
+  echo "[ $out_tag ] Running PSI-BLASTs"
   echo "Running PSI-BLASTs" >> "$logfile"
-  "${script_dir}"run_psiblasts.sh "$database" "$query_file" "$evalue" "$num_iter"
+  "${script_dir}"run_psiblasts.sh "$database" "$query_file" "$evalue" "$num_iter" "$out_tag"
 
   psi_blast_finish_time=$(date +%s%3N)
 
   echo "PSI-BLASTs finished: $psi_blast_finish_time" >> "$logfile"
-  echo "PSI-BLASTs finished: $psi_blast_finish_time"
+  echo "[ $out_tag ] PSI-BLASTs finished: $psi_blast_finish_time"
   echo "Time to run PSI-BLASTs: $((psi_blast_finish_time - start_time)) ms" >> "$logfile"
-  echo "Time to run PSI-BLASTs: $((psi_blast_finish_time - start_time)) ms"
+  echo "[ $out_tag ] Time to run PSI-BLASTs: $((psi_blast_finish_time - start_time)) ms"
 
   query_filename=$(basename "$query_file")
   psiblast_out_file="$outdir"/"${query_filename%.fasta}".out
@@ -284,11 +284,13 @@ then
   # Make sure no label file already exists
   if [ -f "$out_tag".label ]; then
     echo "$out_tag.label already exists in output directory. Please specify a different label file location. Exiting..." >> "$logfile"
-    echo "$out_tag.label already exists in output directory. Please specify a different label file location. Exiting..."
+    echo "[ $out_tag ] $out_tag.label already exists in output directory. Please specify a different label file location. Exiting..."
+    echo "Job failed" >> "$logfile"
+    echo "[ $out_tag ] Job failed"
     exit 1
   else
     echo "No label file specified, creating new $out_tag.label in output directory." >> "$logfile"
-    echo "No label file specified, creating new $out_tag.label in output directory."
+    echo "[ $out_tag ] No label file specified, creating new $out_tag.label in output directory."
     touch "$out_tag".label
     label_file_location="$PWD/$out_tag.label"
   fi
@@ -296,17 +298,26 @@ fi
 
 label_file_name=$(basename "$label_file_location")
 echo "Using $label_file_name as match gene labelling file." >> "$logfile"
-echo "Using $label_file_name as match gene labelling file."
+echo "[ $out_tag ] Using $label_file_name as match gene labelling file."
 
 # Get relevant info from psiblast output (GBFF_NAME MATCH_ACCESSION QUERY_ACCESSION E_VALUE PID QUERY_LEN MATCH_LEN MATCH_LEN/QUERY_LEN)
 # Also updates the label file with new match data
 echo "Parsing PSI-BLAST output..." >> "$logfile"
-echo "Parsing PSI-BLAST output..."
+echo "[ $out_tag ] Parsing PSI-BLAST output..."
 "${script_dir}"parse_psiblast_out.py "$psiblast_out_file"
 
 # For each .parsed file in the current directory, run modify_label_file.py to update the label file with new match data
 num_matches=0
 parsed_directories=()
+
+# Check if a .parsed file was created
+if ! ls *.parsed 1> /dev/null 2>&1; then
+  echo "No non-redundant PSI-BLAST matches to any query. Exiting..." >> "$logfile"
+  echo "[ $out_tag ] No non-redundant PSI-BLAST matches to any query. Exiting..."
+  echo "Job failed" >> "$logfile"
+  echo "[ $out_tag ] Job failed"
+  exit 0
+fi
 
 for file in *.parsed
 do
@@ -323,7 +334,7 @@ do
 
     # Generate genomic neighbourhoods for each file containing matches
     echo "Creating GNs for $file" >> "$logfile"
-    echo "Creating GNs for $file"
+    echo "[ $out_tag ] Creating GNs for $file"
     "${script_dir}"build_gn.py "${filename%.parsed}"/"$file" -d "$gbff" -o "${filename%.parsed}"/ -n "$num_flanking_genes"
 
     parsed_directories=("${parsed_directories[@]}" "${filename%.parsed}")
@@ -333,7 +344,8 @@ done
 # Check if there are any matches after filtering, if not, exit.
 if [[ $num_matches -eq 0 ]]; then
   echo "No non-redundant PSI-BLAST matches to any query. Exiting..." >> "$logfile"
-  echo "No non-redundant PSI-BLAST matches to any query. Exiting..."
+  echo "[ $out_tag ] No non-redundant PSI-BLAST matches to any query. Exiting..."
+  echo "Job failed" >> "$logfile"
   exit 0
 fi
 
@@ -347,7 +359,7 @@ do
   "${script_dir}"generate_krona_plot.py "$psiblast_out_file" -o "$dir"/all.krona.html --raw
 
   echo "Filtering GNs for $dir and generating phylogeny data." >> "$logfile"
-  echo "Filtering GNs for $dir and generating phylogeny data."
+  echo "[ $out_tag ] Filtering GNs for $dir and generating phylogeny data."
 
   # Remove redundants based on aa-seq
   "${script_dir}"redundancy.py "$dir"
@@ -357,7 +369,7 @@ do
 
   # Generate phylo data for all the non-redundant GNs
   if [ "${#gb_files[@]}" -gt 0 ]; then
-    echo "${gb_files[*]}" >> $logfile
+    # echo "${gb_files[*]}" >> $logfile
     "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$dir"/all_non_redundants.krona.html
   fi
 
@@ -370,7 +382,7 @@ do
 
   # Run plotting on NR clusters
   echo "Generating phylogeny data and clinker plots for all non-redundant clusters in $dir" >> "$logfile"
-  echo "Generating phylogeny data and clinker plots for all non-redundant clusters in $dir"
+  echo "[ $out_tag ] Generating phylogeny data and clinker plots for all non-redundant clusters in $dir"
 
   if [[ $(ls "$dir"/all_non_redundants | wc -l) -gt 0 ]]; then
       for cluster_dir in "$dir"/all_non_redundants/*_cluster_*
@@ -419,7 +431,7 @@ do
       # If there are clusters, generate Krona and Clinker plots for each cluster
       if [[ $(ls "$s" | wc -l) -gt 0 ]]; then
       echo "Generating Krona and Clinker plots for all clusters in $s" >> "$logfile"
-      echo "Generating Krona and Clinker plots for all clusters in $s"
+      echo "[ $out_tag ] Generating Krona and Clinker plots for all clusters in $s"
 
       for cluster_dir in "$s"/*_cluster_*
         do
@@ -440,7 +452,9 @@ do
   done
 done
 
-echo "Output with out tag $outtag" >> "$logfile"
-echo "Output with out tag $outtag"
+echo "Output with out tag $out_tag" >> "$logfile"
+echo "[ $out_tag ] Output with out tag $out_tag"
+echo "Job finished" >> "$logfile"
+echo "[ $out_tag ] Job finished"
 
 
