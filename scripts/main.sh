@@ -158,6 +158,41 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Build the output and log before anything else
+if [ "$gnat_flag" == 'false' ]; then
+  out_location=$(cd "$out_location" || exit; pwd; cd "$curr_dir" || exit)
+
+  outdir="$out_location"/gnat_out_"$out_tag"
+
+  # Check if outdir exists, if so, exit
+  if [ -d "$outdir" ]; then
+    echo "[ $out_tag ] Error: directory $outdir exists. Specify a different -ot or -ol. Exiting...";
+    exit 1;
+  fi
+
+  # Create the output directory
+  mkdir "$outdir"
+else
+  # If running on GNAT, outdir already exists
+  outdir="$out_location"/"$out_tag"
+
+  if [ ! -d "$outdir" ]; then
+    echo "[ $out_tag ] Error: job directory $outdir doesn't exist. This shouldn't be possible..."
+    exit 1;
+  fi
+fi
+
+# Create log file
+logfile="$outdir"/"$log_filename"
+touch "$logfile"
+
+echo "[ $out_tag ] Starting..."
+echo "Starting..." > "$logfile"
+
+# Get the start time in ms
+start_time=$(date +%s%3N)
+echo "[ $out_tag ] Start: $start_time"
+
 curr_dir=$(pwd)
 # Check that required arguments were provided
 if [ -z ${query_file+x} ]; then
@@ -196,40 +231,6 @@ echo "[ $out_tag ] BlastDB found!"
 gbff=$(cd "$database_root"/"$org_name"_genomes/gbff || exit; pwd; cd "$curr_dir" || exit)
 echo "[ $out_tag ] GBFFs found!"
 
-if [ "$gnat_flag" == 'false' ]; then
-  out_location=$(cd "$out_location" || exit; pwd; cd "$curr_dir" || exit)
-
-  outdir="$out_location"/gnat_out_"$out_tag"
-
-  # Check if outdir exists, if so, exit
-  if [ -d "$outdir" ]; then
-    echo "[ $out_tag ] Error: directory $outdir exists. Specify a different -ot or -ol. Exiting...";
-    exit 1;
-  fi
-
-  # Create the output directory
-  mkdir "$outdir"
-else
-  # If running on GNAT, outdir already exists
-  outdir="$out_location"/"$out_tag"
-
-  if [ ! -d "$outdir" ]; then
-    echo "[ $out_tag ] Error: job directory $outdir doesn't exist. This shouldn't be possible..."
-    exit 1;
-  fi
-fi
-
-# Create log file
-logfile="$outdir"/"$log_filename"
-touch "$logfile"
-
-echo "[ $out_tag ] Starting..."
-echo "Starting..." > "$logfile"
-
-# Get the start time in ms
-start_time=$(date +%s%3N)
-echo "[ $out_tag ] Start: $start_time" >> "$logfile"
-
 # Run scripts
 cd "$outdir" || exit 1
 
@@ -255,9 +256,8 @@ if [ ! -z ${query_file+x} ]; then
 
   psi_blast_finish_time=$(date +%s%3N)
 
-  echo "PSI-BLASTs finished: $psi_blast_finish_time" >> "$logfile"
+  echo "PSI-BLASTs finished in $((psi_blast_finish_time - start_time)) ms" >> "$logfile"
   echo "[ $out_tag ] PSI-BLASTs finished: $psi_blast_finish_time"
-  echo "Time to run PSI-BLASTs: $((psi_blast_finish_time - start_time)) ms" >> "$logfile"
   echo "[ $out_tag ] Time to run PSI-BLASTs: $((psi_blast_finish_time - start_time)) ms"
 
   query_filename=$(basename "$query_file")
