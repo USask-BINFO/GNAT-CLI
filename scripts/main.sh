@@ -456,5 +456,3 @@ echo "Output with out tag $out_tag" >> "$logfile"
 echo "[ $out_tag ] Output with out tag $out_tag"
 echo "Job finished" >> "$logfile"
 echo "[ $out_tag ] Job finished"
-
-
