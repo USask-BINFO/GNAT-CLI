@@ -17,8 +17,9 @@ link = argv[1]
 existing = argv[2]
 
 if "ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank" != link[:42]:
-    raise ValueError("Error: Provided link does not appear to be from the ncbi ftp site " +
-    "(ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank). Provided link: '%s'" % link)
+    if not link.startswith("ftp://ftp.ncbi.nih.gov/genomes/genbank"):
+        raise ValueError("Error: Provided link does not appear to be from the ncbi ftp site " +
+        "(ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank OR ftp://ftp.ncbi.nih.gov/genomes/genbank). Provided link: '%s'" % link)
 if "/assembly_summary.txt" != link[-21:]:
     raise ValueError("Error: Provided link doesn't end in /assembly_summary.txt. This file " +
     "is required to build the database. Provided link: '%s'" % link)
