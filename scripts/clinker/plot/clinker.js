@@ -121,10 +121,10 @@ for (let c in data.clusters) {
     }
 }
 
-
+// Getting the frequencies for Group product labeling
 for (g in data.groups) {
   const group = data.groups[g];
-  let psiFlag = false;
+  let psiFlag = false; // Flag to check if psi_blast_match is present in group
   let groupProducts = {};
   let newLabel = group.label + ": ";
 
@@ -135,10 +135,10 @@ for (g in data.groups) {
         psiFlag = true;
       }
     }
-    if (geneUidMap[geneUid][0] != "undefined") {
+    if (geneUidMap[geneUid][0] != "undefined" && geneUidMap[geneUid][0] != null && typeof geneUidMap[geneUid][0] == "string" && geneUidMap[geneUid][0].trim() != "") {
       groupProducts[geneUidMap[geneUid][0]] == null ? groupProducts[geneUidMap[geneUid][0]] = 1 : groupProducts[geneUidMap[geneUid][0]]++;
     }
-    else { alert([geneUidMap[geneUid], geneUid]) }
+    // else { alert([geneUidMap[geneUid], geneUid]) }
   }
 
 
