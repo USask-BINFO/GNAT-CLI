@@ -44,10 +44,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "[ $OUT_TAG ] PSI-BLAST Query: $(basename $FASTAFILE)"
+touch outfile.out
 while read -r db_name;
 do
   echo "[ $OUT_TAG ] Querying: $db_name"
-  psiblast -query "$FASTAFILE" -db "$DBDIR/$db_name" -num_iterations "$NUM_ITER" -num_threads 4 -outfmt "6 qacc sacc pident qlen slen evalue" -evalue "$EVAL" > outfile.out;
+  psiblast -query "$FASTAFILE" -db "$DBDIR/$db_name" -num_iterations "$NUM_ITER" -num_threads 4 -outfmt "6 qacc sacc pident qlen slen evalue" -evalue "$EVAL" >> outfile.out;
 done < "$DBDIR"/all_pal_names.txt
 
 filename=$(basename "$FASTAFILE")
