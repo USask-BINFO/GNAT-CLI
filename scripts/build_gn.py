@@ -5,7 +5,6 @@ modify the n param in find_cluster()
 """
 
 from Bio import SeqIO
-from Bio.SeqRecord import SeqRecord
 import gzip
 import argparse
 from os import path
@@ -28,7 +27,7 @@ with open(args.parsed_out, "r") as f:
 if args.n is not None:
     num_genomes = args.n
 else:
-    num_genomes = 20
+    num_genomes = 15
 
 # holds the column values from a modified tab delimted psiblast output for each match against a query
 genomes = []
@@ -70,12 +69,13 @@ def build_gn_from_features(original_record, feature_list):
     # Get start and end positions of the new record
     start, end = feature_list[0].location.start, feature_list[-1].location.end
 
-    # Loop to ensure there aren't overlapping genes that go further than the first/last in the list
-    for feature in feature_list:
-        if feature.location.start < start:
-            start = feature.location.start
-        if feature.location.end > end:
-            end = feature.location.end
+    # No longer using this loop so that the GN cuts off at the start/end of the first/last gene (respectively). It will still include genes fully overlapped by the edge gene, but avoids the rare edge case where a gene within the GN consists of two exons super far apart and results in a GN that is bascially the entire genome.
+    # # Loop to ensure there aren't overlapping genes that go further than the first/last in the list
+    # for feature in feature_list:
+    #     if feature.location.start < start:
+    #         start = feature.location.start
+    #     if feature.location.end > end:
+    #         end = feature.location.end
     
     new_record = original_record[start:end]
 
