@@ -51,7 +51,96 @@ for line in lines:
         accessions.append(line.split()[1])
         e_values.append(float(line.split()[2]))
 
-def build_gn_from_features(original_record, feature_list):
+def get_num_features(record):
+    """
+    Get the number of CDS features in a GenBank record.
+    :param record: GenBank record to count features in.
+    :return: Number of CDS features in the record.
+    """
+    return len([feature for feature in record.features if feature.type == "CDS"])
+
+def get_feature_index(record, accession):
+    """
+    Get the index of a given protein accession (feature) in the GenBank record.
+    :param record: GenBank record to search for the feature in.
+    :param accession: Accession number of the protein in the feature to find.
+    :return: Index of the feature in the record.
+    """
+    for i, feature in enumerate(record.features):
+        if 'protein_id' in feature.qualifiers and feature.qualifiers['protein_id'][0] == accession:
+            return i
+    return -1
+
+def get_flanks(record, split_index):
+    """
+    Split a record feature list into 3 sublists around the specified index: [before][index][after]
+    :param record: GenBank record containing the features to separate
+    :param split_index: The index to split flanks off from, usually the match index.
+    :return: [list, of, features, before, idx], [idx], [features, after, idx]
+    """
+    features = [feature for feature in record.features if feature.type == "CDS"]
+
+    before, match, after = features[:split_index], features[split_index], features[split_index+1:]
+
+    return before, match, after
+
+def trim_flank(flank, edge_gene, side, additional_genes_allowed=3):
+    """
+    Trim the flank list to the edge gene and up to 3 additional overlapping genes.
+    :param flank: List of features to trim. (either 'after' or reversed 'before' from get_flanks)
+    :param edge_gene: Feature to trim to.
+    :param side: +1 or -1 to indicate which side of the match gene the features are on. +1 is after the match gene, -1 is before.
+    :param additional_genes_allowed: Number of additional overlapping genes to allow. Default 3.
+    :return: Trimmed list of features.
+    """
+    # Walk through until we hit the edge gene
+    edge_position = 0
+    for i in range(len(flank)):
+        feature = flank[i]
+        if feature == edge_gene:
+            edge_position = i
+            break
+    
+    # Now that we're at the edge gene, allow up to 3 more genes, only if they overlap with the edge gene
+    end_position = edge_position
+    for i in range(edge_position + 1, len(flank)):
+        if are_features_overlapping(edge_gene, flank[i], side):
+            additional_genes_allowed -= 1
+            end_position = i
+            if additional_genes_allowed == 0:
+                break
+        else:
+            break
+
+    # Trim the list to the edge gene and the additional overlapping genes
+    return flank[:end_position + 1]
+
+def are_features_overlapping(feature1, feature2, side):
+    """
+    Check if two CDS features are overlapping.
+    :param feature1: First feature to check (feature closer to the match gene).
+    :param feature2: Second feature to check (feature further from the match gene).
+    :param side: +1 or -1 to indicate which side of the match gene the features are on. +1 is after the match gene, -1 is before.
+    :return: True if the features are overlapping, False otherwise.
+    """
+    def start_end_to_earliest_latest(start, end):
+        """
+        Converts the start and end coordinates to earliest and latest to make it orientation-independent.
+        """
+        return min(start, end), max(start, end)
+    
+    # Get the start and end coordinates of the features (multiplied by side to make sure conversion to ealiest & latest works properly)
+    f1_start, f1_end = feature1.location.start * side, feature1.location.end * side
+    f2_start, f2_end = feature2.location.start * side, feature2.location.end * side
+
+    # Convert to earliest, latest (only need f1 early and f2 late)
+    _, f1_latest = start_end_to_earliest_latest(f1_start, f1_end)
+    f2_earliest, _ = start_end_to_earliest_latest(f2_start, f2_end)
+
+    # If f2 earliest is less than f1 latest, the genes are overlapping
+    return f2_earliest < f1_latest
+
+def build_gn_from_features(original_record, feature_list, match_accession):
     """
     Build a new GenBank record from a list of features extracted by find_cluster().
     Builds the new record from the loci cooridinates of the earliest and latest features,
@@ -61,6 +150,7 @@ def build_gn_from_features(original_record, feature_list):
 
     :param original_record: Original SeqRecord to use for sequence data and annotations.
     :param feature_list: List of SeqFeatures to include in the new record.
+    :param match_accession: Accession of the PSI-BLAST match the GN is being built around.
     :return: New SeqRecord with the specified gene features. 
     """
     if not feature_list:
@@ -70,19 +160,46 @@ def build_gn_from_features(original_record, feature_list):
     start, end = feature_list[0].location.start, feature_list[-1].location.end
 
     # No longer using this loop so that the GN cuts off at the start/end of the first/last gene (respectively). It will still include genes fully overlapped by the edge gene, but avoids the rare edge case where a gene within the GN consists of two exons super far apart and results in a GN that is bascially the entire genome.
-    # # Loop to ensure there aren't overlapping genes that go further than the first/last in the list
-    # for feature in feature_list:
-    #     if feature.location.start < start:
-    #         start = feature.location.start
-    #     if feature.location.end > end:
-    #         end = feature.location.end
-    
+    # Loop to ensure there aren't overlapping genes that go further than the first/last in the list
+    for feature in feature_list:
+        if feature.location.start < start:
+            start = feature.location.start
+        if feature.location.end > end:
+            end = feature.location.end
+
     new_record = original_record[start:end]
+
+    # Check the number of features in the new GN
+    if get_num_features(new_record) > (len(feature_list) + 6):
+        # If there are more features than expected (plus a little extra for potentially overlapping genes), separate the flanks and start trimming them
+        edge_gene_before, edge_gene_after = feature_list[0], feature_list[-1]
+        new_record_match_idx = get_feature_index(new_record, match_accession)
+
+        # Get the flanks of the GN
+        before, match, after = get_flanks(new_record, new_record_match_idx)
+
+        # Check the lengths of each flank
+        if len(before) > num_genomes + 3:
+            # Flip the list to get the 'earliest' genes (genes closest to match)
+            before = before[::-1]
+            before = trim_flank(before, edge_gene_before, -1)
+            before = before[::-1]
+        
+        if len(after) > num_genomes + 3:
+            after = trim_flank(after, edge_gene_after, 1)
+
+        # Combine the flanks and match gene
+        new_features = before + [match] + after
+
+        # Create a new record explicitly with the new features
+        start = new_features[0].location.start
+        end = new_features[-1].location.end
+        new_record = original_record[start:end]
+        new_record.features = new_features
 
     new_record.annotations = original_record.annotations
 
     return new_record
-
 
 def find_cluster(genomename, accessionpos, n):
     """
@@ -123,12 +240,12 @@ def find_cluster(genomename, accessionpos, n):
                             if feature == record.features[-1]:
                                 # print("Reached end of record")  # no more downstream genes in record
                                 n_upstream_plusmatch.extend(n_downstream)  # combine the two lists into one
-                                return build_gn_from_features(record_match_foundin, n_upstream_plusmatch)
+                                return build_gn_from_features(record_match_foundin, n_upstream_plusmatch, accessionpos)
 
                         # n in downstream list, create genbank cluster and return
                         else:
                             n_upstream_plusmatch.extend(n_downstream)
-                            return build_gn_from_features(record_match_foundin, n_upstream_plusmatch)
+                            return build_gn_from_features(record_match_foundin, n_upstream_plusmatch, accessionpos)
 
                     # if a protein_id exists and it matches the accession number of the match
                     if 'protein_id' in feature.qualifiers and feature.qualifiers['protein_id'][0] == accessionpos:
@@ -139,12 +256,12 @@ def find_cluster(genomename, accessionpos, n):
                         if feature == record.features[-1]:
                             n_upstream_plusmatch.extend(n_downstream)
                             # print("Match in last Feature")
-                            return build_gn_from_features(record_match_foundin, n_upstream_plusmatch)
+                            return build_gn_from_features(record_match_foundin, n_upstream_plusmatch, accessionpos)
 
                 elif feature.type != 'CDS' and feature == record.features[-1] and matchreached:
                     n_upstream_plusmatch.extend(n_downstream)  # combine the two lists into one
                     # print("Match in last CDS")
-                    return build_gn_from_features(record_match_foundin, n_upstream_plusmatch)
+                    return build_gn_from_features(record_match_foundin, n_upstream_plusmatch, accessionpos)
 
 
 # Main
