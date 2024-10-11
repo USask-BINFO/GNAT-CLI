@@ -184,7 +184,12 @@ fi
 
 # Create log file
 logfile="$outdir"/"$log_filename"
-touch "$logfile"
+
+# Create the log file if it doesn't exist
+if [ ! -f "$logfile" ]; then
+  touch "$logfile"
+  echo "Running pipeline..." > "$logfile"
+fi
 
 echo "[ $out_tag ] Starting..."
 echo "Starting..." > "$logfile"
@@ -299,6 +304,11 @@ fi
 label_file_name=$(basename "$label_file_location")
 echo "Using $label_file_name as match gene labelling file." >> "$logfile"
 echo "[ $out_tag ] Using $label_file_name as match gene labelling file."
+
+
+# # Now that pretty much all the user-inputs have been parsed, we'll split the input file (query or PSI-Out) into individual files based on the query accession(s)
+# # Get the number of PSI-BLAST queries with matches from the psi out file
+# num_queries=$(grep -oP '^\S+' "$psiblast_out_file" | sort | uniq | wc -l)
 
 # Get relevant info from psiblast output (GBFF_NAME MATCH_ACCESSION QUERY_ACCESSION E_VALUE PID QUERY_LEN MATCH_LEN MATCH_LEN/QUERY_LEN)
 # Also updates the label file with new match data
