@@ -140,6 +140,24 @@ def are_features_overlapping(feature1, feature2, side):
     # If f2 earliest is less than f1 latest, the genes are overlapping
     return f2_earliest < f1_latest
 
+def does_feature_wrap_origin(feature, original_record):
+    """
+    Checks if a gene wraps around the genome. (i.e. is broken over the start/end of the genome since bacterial genomes are circular).
+    We'll eventually remove these genes from the GNs, since Clinker doesn't display them well.
+    :param feature: Feature to check for wrapping.
+    :param original_record: Original record the feature came from (e.g., full gbff file).
+    :return: True if the feature wraps around the genome, False otherwise.
+    """
+    genome_length = len(original_record.seq)
+
+    # Get the start and end positions of the feature
+    start, end = feature.location.start, feature.location.end
+    print(start, end)
+
+    if start == 0 and end == genome_length:
+        return True
+    return False
+
 def build_gn_from_features(original_record, feature_list, match_accession):
     """
     Build a new GenBank record from a list of features extracted by find_cluster().
@@ -187,6 +205,16 @@ def build_gn_from_features(original_record, feature_list, match_accession):
         
         if len(after) > num_genomes + 3:
             after = trim_flank(after, edge_gene_after, 1)
+
+        # Check the first and last gene features, if either of them overlap to the other end of the genome, remove them
+        first_gene = before[0]
+        last_gene = after[-1]
+
+        if does_feature_wrap_origin(first_gene, original_record):
+            before = before[1:]
+
+        if does_feature_wrap_origin(last_gene, original_record):
+            after = after[:-2]
 
         # Combine the flanks and match gene
         new_features = before + [match] + after
