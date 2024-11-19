@@ -666,28 +666,60 @@ for (target of targets) {
 // Add event listeners to thicken borders of genes that are members of hovered group
 const groupTargets = document.getElementsByClassName("legend")[0].getElementsByClassName("element");
 
+function boldGroup(g) {
+  // Function to bold-ify the borders of genes within a group
+  g.style.fontWeight = 'bold';
+  let gUid = g.getElementsByTagName("circle")[0].getAttribute("class");
+  for (e of document.getElementsByClassName(gUid)) {
+    if (e.tagName == "polygon") {
+      e.setAttribute("style", "stroke: black; stroke-width: 5")
+    }
+  }
+}
+
+function unboldGroup(g) {
+  // Function to unbold-ify the borders of genes within a group
+  let gUid = g.getElementsByTagName("circle")[0].getAttribute("class");
+  g.style.fontWeight = 'normal';
+  for (e of document.getElementsByClassName(gUid)) {
+    if (e.tagName == "polygon") {
+      e.setAttribute("style", "stroke: black; stroke-width: 1")
+    }
+  }
+}
+
+function checkBold(g) {
+  // Function to check if a group is bold-ified
+  return g.style.fontWeight == 'bold';
+}
+
 for (g of groupTargets) {
+  g.boldToggled = false; // Set a flag to check if the group was bolded via dblclick
+
   g.addEventListener("mouseenter", function() {
-    this.style.fontWeight = 'bold';
-    let gUid = this.getElementsByTagName("circle")[0].getAttribute("class");
-    for (e of document.getElementsByClassName(gUid)) {
-      if (e.tagName == "polygon") {
-        e.setAttribute("style", "stroke: black; stroke-width: 5")
-      }
+    if (!checkBold(this) && !this.boldToggled) {
+      boldGroup(this);
     }
   })
 
   g.addEventListener("mouseleave", function() {
-    let gUid = this.getElementsByTagName("circle")[0].getAttribute("class");
-    this.style.fontWeight = 'normal';
-    for (e of document.getElementsByClassName(gUid)) {
-      if (e.tagName == "polygon") {
-        e.setAttribute("style", "stroke: black; stroke-width: 1")
+    if (checkBold(this) && !this.boldToggled) {
+      unboldGroup(this);
+    }
+  })
+
+  g.addEventListener("click", function(e) {
+    if (e.shiftKey) {
+      if (this.boldToggled) {
+        this.boldToggled = false;
+        unboldGroup(this);
+      } else {
+        this.boldToggled = true;
+        boldGroup(this);
       }
     }
   })
 }
-
 
 
 // End

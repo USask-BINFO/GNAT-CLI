@@ -45,8 +45,8 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
             path, mime = self._dir / "style.css", "text/css"
         elif self.path == "/d3.min.js":
             path, mime = self._dir / "d3.min.js", "text/javascript"
-        elif self.path == "/clustermap.min.js":
-            path, mime = self._dir / "clustermap.min.js", "text/javascript"
+        elif self.path == "/clustermap.js":
+            path, mime = self._dir / "clustermap.js", "text/javascript"
         elif self.path == "/clinker.js":
             path, mime = self._dir / "clinker.js", "text/javascript"
         if not path:
@@ -87,7 +87,7 @@ def save_html(data, output):
     css_string = '<link rel="stylesheet" href="style.css"></link>'
     d3_string = '<script src="d3.min.js"></script>'
     cl_string = '<script src="clinker.js"></script>'
-    cm_string = '<script src="clustermap.min.js"></script>'
+    cm_string = '<script src="clustermap.js"></script>'
 
     with (directory / "style.css").open() as fp:
         css = fp.read()
@@ -97,7 +97,7 @@ def save_html(data, output):
         d3 = fp.read()
         html = html.replace(d3_string, f"<script>{d3}</script>")
 
-    with (directory / "clustermap.min.js").open() as fp:
+    with (directory / "clustermap.js").open() as fp:
         cm = fp.read()
         html = html.replace(cm_string, f"<script>{cm}</script>")
 
