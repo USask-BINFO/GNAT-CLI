@@ -47,7 +47,6 @@ def parse_gnat_label_file(label_file_location=None):
     
     try:
         with open(label_file_location, "r") as f:
-            labels = {}
             accessions = {}
             is_new = False
 
@@ -61,8 +60,6 @@ def parse_gnat_label_file(label_file_location=None):
                     for j in range(3, len(line.split(",")), 2):
                         classes.append({"label_name": line.split(",")[j], "label_map": {}})
                     continue
-                    
-                    print(classes)
 
                 elif i == 0 and not line.startswith("#"):
                     # Make sure it's in the old format if the first line isn't a header
