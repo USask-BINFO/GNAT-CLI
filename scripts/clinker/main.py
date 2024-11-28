@@ -21,7 +21,7 @@ from os import path as osPath
 
 import align
 from plot import plot_clusters, plot_data
-from classes import find_files, parse_files, labelfilelocation
+from classes import find_files, parse_files, label_file_dict_container
 __version__ = "0.0.23"
 
 logging.basicConfig(
@@ -31,6 +31,119 @@ logging.basicConfig(
 )
 LOG = logging.getLogger(__name__)
 
+def parse_gnat_label_file(label_file_location=None):
+    """
+    GNAT/AcrVis function to parse the gene labelling file.
+    Old format: tsv mapping [0] accession to [1] label with [2] e-value of the match
+    New format: csv mapping [0] accession to [1] label with [2] e-value of the match, and additional n*2 items (n=number of class labels), where, e.g., [3] class label name (e.g., Abi2) and [4] is the hex colour to make genes with that label. These additional labels will be used to create n new gene Groups with new colouring and legends. Note this format also has a header line (beginning with #) containing the names of each header (including the name of each class label group (e.g., [3] defense_systems))
+    
+    :param label_file_location: Location of the label file to parse.
+
+    return: Dict containing: "is_new": bool, "labels": {accession: [label, e-value]}, "class_labels": [{"label_name": str, "label_map": {str label: {"accessions": [accession, ...], "colour": str}}}, ...] or None if not "is_new"
+    """
+    if label_file_location == "" or label_file_location is None:
+        LOG.warning("No label file provided. GNAT labelling will not be enabled.")
+        return None
+    
+    try:
+        with open(label_file_location, "r") as f:
+            labels = {}
+            accessions = {}
+            is_new = False
+
+            for i, line in enumerate(f):
+
+                # Skip header line if file is in new format
+                if i == 0 and line.startswith("#"):
+                    is_new = True
+                    classes = [] # Init a list to store the n class types
+
+                    for j in range(3, len(line.split(",")), 2):
+                        classes.append({"label_name": line.split(",")[j], "label_map": {}})
+                    continue
+                    
+                    print(classes)
+
+                elif i == 0 and not line.startswith("#"):
+                    # Make sure it's in the old format if the first line isn't a header
+                    if not len(line.split()) == 3:
+                        LOG.warning("Label file does not start with a header line (as expected for a new format file), but also does not contain the expected 3 tab-delimited columns expected of the old format. GNAT labelling will not be enabled.")
+                        return None
+
+
+                if is_new:
+                    # Parse lines in new format
+                    line = line.strip().split(",")
+                    replace_dupe = False # Flag to replace duplicate accessions' class labels with the lower e-value's ones
+
+                    accession, label, e_value = line[0], line[1], line[2]
+
+                    if accessions.get(accession, None) is not None:
+                        LOG.warning(f"Duplicate accession found in label file: {accession}. The one with the lower E-value will be used.")
+                        if e_value < accessions[accession][1]:
+                            replace_dupe = True
+                            old_classes = accessions[accession][2]
+                            accessions[accession] = [label, e_value, line[3:]]
+                        else:
+                            continue
+                    else:
+                        accessions[accession] = [label, e_value, line[3:]]
+
+                    if replace_dupe:
+                        # Remove accession from old class label
+                        for j in range(0, len(old_classes), 2):
+                            class_idx = j // 2
+                            class_label = old_classes[j]
+
+                            if accession in classes[class_idx]["label_map"][class_label]["accessions"]:
+                                classes[class_idx]["label_map"][class_label]["accessions"].remove(accession)
+
+                    for j in range(3, len(line), 2):
+                        class_idx = (j - 3) // 2
+
+                        class_label = line[j]
+                        class_colour = line[j+1]
+
+                        if class_label not in classes[class_idx]["label_map"]:
+                            classes[class_idx]["label_map"][class_label] = {"accessions": [accession], "colour": class_colour}
+
+                        else:
+                            # Class label already exists, add accession to it (and make sure the colour is the same)
+                            if class_colour != classes[class_idx]["label_map"][class_label]["colour"]:
+                                LOG.warning(f"Class label '{class_label}' has multiple colours in label file (new colour: {class_colour}). Using the first one in the label file: {classes[class_idx]['label_map'][class_label]['colour']}.")
+                            
+                            # Double check that the accession isn't already in the class label (if it is, something is wrong)
+                            if accession in classes[class_idx]["label_map"][class_label]['accessions']:
+                                LOG.error(f"Accession {accession} is already in class label {class_label}. This should not be possible.\nTruncated class label dict so far: {str(classes)[:50]}...\nTruncated offending entry: {str(classes[class_idx]['label_map'][class_label]['accessions'])[:100]}...")
+                                return None
+                            
+                            classes[class_idx]["label_map"][class_label]['accessions'].append(accession)
+
+                else:
+                    # Parse lines in old format
+                    accession, label, e_value = line.split()
+                    
+                    if accessions.get(accession, None) is not None:
+                        LOG.warning(f"Duplicate accession found in label file: {accession}. The one with the lower E-value will be used.")
+                        if e_value < accessions[accession][1]:
+                            accessions[accession] = [label, e_value]
+                        else:
+                            continue
+                    else:
+                        accessions[accession] = [label, e_value]
+
+            if is_new:
+                return {"is_new": is_new, "labels": accessions, "class_labels": classes}
+            else:
+                return {"is_new": is_new, "labels": accessions, "class_labels": None}
+    
+
+    except FileNotFoundError:
+        LOG.warning(f"Label file not found at location: {label_file_location}. GNAT labelling will not be enabled.")
+        return None
+    except Exception as e:
+        LOG.error(f"Unexpected error parsing label file: {e.__class__.__name__}: {e}")
+        return None
 
 def parse_range(string):
     """Extracts the scaffold name, start and end of a scaffold range string.
@@ -100,7 +213,8 @@ def clinker(
     jobs=None,
     ranges=None,
     matrix_out=None,
-    gene_functions=None
+    gene_functions=None,
+    gnat_label=False
 ):
     """Entry point for running the script."""
     LOG.info("Starting clinker")
@@ -151,7 +265,7 @@ def clinker(
             LOG.error("No files found")
             raise SystemExit
         LOG.info("Parsing files:")
-        clusters = parse_files(paths, ranges=ranges)
+        clusters = parse_files(paths, ranges=ranges, gnat_label=gnat_label)
 
         # Align all clusters
         if no_align:
@@ -329,16 +443,24 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
     
-    labelfilelocation[0] = args.labelling_file
+    # labelfilelocation[0] = args.labelling_file
     lf = args.labelling_file
-    if lf == "":
-        LOG.warn("No labelling file provided. Psi-BLAST matches will not be labelled.")
+
+    # label_dict = parse_gnat_label_file(lf)
+    label_file_dict = parse_gnat_label_file(lf)
+    if label_file_dict is None:
+        gnat_labelling = False
     else:
-        if not osPath.isfile(lf):
-            LOG.warn("Warning: '%s' is not recognized as a file. Psi-BLAST matches will not be labelled." % lf)
-            labelfilelocation[0] = ""
-        else:
-            LOG.info("Using '%s' as psi-BlAST labelling file." % lf)
+        gnat_labelling = True
+        label_file_dict_container[0] = label_file_dict
+
+    # Label Dict structure:
+    # { "is_new": bool, 
+    #   "labels": {accession: [label, e-value, [split_line[3:] (if is_new)]]}, 
+    #   "class_labels": [{"label_name": str, 
+    #                     "label_map": {str label: {"accessions": [accession, ...], 
+    #                                               "colour": str}}}, 
+    #                    ...] or None if not is_new }
 
     clinker(
         args.files,
@@ -358,6 +480,7 @@ def main():
         ranges=args.ranges,
         matrix_out=args.matrix_out,
         gene_functions=args.gene_functions,
+        gnat_label=gnat_labelling
     )
 
 if __name__ == "__main__":
