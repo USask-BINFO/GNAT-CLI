@@ -28,8 +28,99 @@ FASTA_SUFFIXES = (".fa", ".fsa", ".fna", ".fasta", ".faa")
 GBK_SUFFIXES = (".gbk", ".gb", ".genbank", ".gbf", ".gbff")
 GFF_SUFFIXES = (".gtf", ".gff", ".gff3")
 
+label_file_dict_container = [None]
 labelfilelocation = [None]
+# print(label_file_dict)
 #print(labelfilelocation)
+
+# TODO: Use this instead of the code inside of the Gene __init__ method so that it doesn't rerun for every gene.
+# def parse_label_file(label_file_path=None):
+#     """
+#     Function to parse the label file and return a mapping of accessions to labels and a mapping of accessions to class labels and colours. (GNAT function)
+#     :param label_file_path: The path to the label file. If None, the function will try use labelfilelocation[0] as the path (which was the old method of accessing the label file location, defined in main.py).
+#     :return: A tuple containing the mapping of accessions to labels and the mapping of accessions to class labels and colours.
+#     """
+#     if label_file_path is None:
+#         label_file_path = labelfilelocation[0]
+    
+#     if label_file_path == "":
+#         return {}, {}
+
+#     try:
+
+#         new_lf = False
+#         with open(label_file_path, "r") as f:
+
+#             # Accession-label map
+#             labels = {}
+
+#             for i, line in enumerate(f):
+#                 # Skip first line and trigger new lf_format flag if starts with #
+#                 if i == 0 and line.startswith("#"):
+#                     new_lf = True
+#                     classes = [] # A list of the n label classes
+#                     for j in range(3, len(line.split(",")), 2):
+#                         classes.append({"name": line.split(",")[j], "label_map": {}}) # Each list contains the name of the class label (from the header) and a mapping of the accessions to the label and colour
+
+#                     continue
+
+#                 if new_lf:
+#                     # Parse line as new csv format
+#                     line = line.rstrip().split(",")
+
+#                     accession = line[0]
+#                     label = line[1]
+#                     e_value = line[2]
+
+#                     for j in range(3, len(line), 2):
+#                         class_idx = (j - 3) // 2
+
+#                         class_label = line[j]
+#                         class_colour = line[j + 1]
+
+#                         if accession in classes[class_idx]["label_map"]:
+#                             # This case shouldn't happen (since there shouldn't be repeat accessions), if it does, we'll uuse the label and colour with the lower-evalue match
+#                             print(f"WARNING: Accession {accession} is repeated in the label file. Using label and colour with the lower e-value. Existing label: {classes[class_idx]['label_map'][accession][0]}, Existing e-value: {classes[class_idx]['label_map'][accession][1]}, New label: {class_label}, New e-value: {e_value}")
+#                             if e_value < classes[class_idx]["label_map"][accession][0][2]:
+#                                 classes[class_idx]["label_map"][accession] = [(class_label, class_colour, e_value)]
+#                         else:
+#                             # Add the class, colour, and evalue to the label map
+#                             classes[class_idx]["label_map"][line[j]] = [(class_label, class_colour, e_value)]
+                        
+
+#                 else:
+#                     # Parse line as old tsv format
+#                     line = line.rstrip().split()
+                    
+#                     accession = line[0]
+#                     label = line[1]
+#                     e_value = line[2]
+                
+#                 if accession in labels:
+#                     # This case shouldn't happen (since there shouldn't be repeat accessions), if it does, we'll use the label and colour with the lower-evalue match
+#                     print(f"WARNING: Accession {accession} is repeated in the label file. Using label and colour with the lower e-value. Existing label: {labels[accession][0]}, Existing e-value: {labels[accession][1]}, New label: {label}, New e-value: {e_value}")
+#                     if e_value < labels[accession][2]:
+#                         labels[accession] = (label, e_value)
+#                 else:
+#                     labels[accession] = (label, e_value)
+
+#         return labels, classes
+
+#     except FileNotFoundError:
+#         LOG.info("label file does not exist in this directory. gene['names']['psi_blast_match'] will "
+#                     "always be false.")
+#         # self.names["psi_blast_match"] = None
+#         # self.names["match_short"] = None
+#         # self.names["match_very_short"] = None
+#         return {}, {}
+#     except Exception as e:
+#         LOG.info("Unknown exception occurred: %s." % e)
+#         return {}, {}
+#     #     self.names["psi_blast_match"] = None
+#     #     self.names["match_short"] = None
+#     #     self.names["match_very_short"] = None
+#     # self.names["clear"] = ' '
+    
 
 def find_fasta(gff_path):
     path = None
@@ -57,7 +148,7 @@ def find_regions(directives):
     return regions
 
 
-def cluster_from_gff(path, ranges=None):
+def cluster_from_gff(path, ranges=None, gnat_label=False):
     """Parses a GFF3 file using GFFUtils."""
 
     # Check for FASTA file
@@ -164,7 +255,7 @@ def cluster_from_gff(path, ranges=None):
                 )
                 start = feature.location.start + record_start
                 end = feature.location.end + record_start
-            gene = Gene.from_seqfeature(feature, record, start=start, end=end)
+            gene = Gene.from_seqfeature(feature, record, start=start, end=end, gnat_label=gnat_label)
             genes.append(gene)
 
         locus = Locus(record.id, genes, start=record_start, end=record_end)
@@ -200,12 +291,13 @@ def get_value(d, keys):
             return d[key]
 
 
-def cluster_from_genbank(path, ranges=None):
+def cluster_from_genbank(path, ranges=None, gnat_label=False):
     """Instantiates a new Cluster object from a GenBank file at `path`.
 
     Args:
         path (str): Path to GenBank file
         ranges (dict): Dictionary of scaffold ranges
+        gnat_label (bool): Whether to use GNAT labels
     Returns:
         Cluster
     """
@@ -215,9 +307,9 @@ def cluster_from_genbank(path, ranges=None):
         for record in SeqIO.parse(fp, "genbank"):
             if ranges and record.id in ranges:
                 start, end = ranges[record.id]
-                locus = Locus.from_seqrecord(record, start=start - 1, end=end)
+                locus = Locus.from_seqrecord(record, start=start - 1, end=end, gnat_label=gnat_label)
             else:
-                locus = Locus.from_seqrecord(record)
+                locus = Locus.from_seqrecord(record, gnat_label=gnat_label)
             loci.append(locus)
     return Cluster(path.stem, loci)
 
@@ -237,14 +329,14 @@ def find_files(paths, recurse=True, level=0):
     return files
 
 
-def parse_files(paths, ranges=None):
+def parse_files(paths, ranges=None, gnat_label=False):
     clusters = []
     for path in paths:
         LOG.info("  %s", Path(path).name)
         if Path(path).suffix.lower() in GBK_SUFFIXES:
-            cluster = cluster_from_genbank(path, ranges=ranges)
+            cluster = cluster_from_genbank(path, ranges=ranges, gnat_label=gnat_label)
         elif Path(path).suffix.lower() in GFF_SUFFIXES:
-            cluster = cluster_from_gff(path, ranges=ranges)
+            cluster = cluster_from_gff(path, ranges=ranges, gnat_label=gnat_label)
         else:
             raise TypeError("File %s does not have GenBank or GFF3 extension")
         clusters.append(cluster)
@@ -399,7 +491,7 @@ class Locus(Serializer):
         )
 
     @classmethod
-    def from_seqrecord(cls, record, start=None, end=None):
+    def from_seqrecord(cls, record, start=None, end=None, gnat_label=False):
         """Builds a new Locus from a BioPython SeqRecord."""
 
         if not isinstance(record, SeqRecord.SeqRecord):
@@ -440,6 +532,7 @@ class Locus(Serializer):
                 record,
                 start=int(match.start) if match else None,
                 end=int(match.end) if match else None,
+                gnat_label=gnat_label,
             )
             if gene:
                 genes.append(gene)
@@ -471,6 +564,7 @@ class Gene(Serializer):
             strand=None,
             sequence=None,
             translation=None,
+            gnat_label=False,
     ):
         self.uid = uid if uid else str(uuid.uuid4())
         self.label = label if label else self.uid
@@ -481,58 +575,151 @@ class Gene(Serializer):
         self.sequence = sequence
         self.translation = translation
 
-        if "product" in self.names:
+        if "product" in self.names: # Suppress hypothetical protein annotations, which clutter the visualisation
             if self.names["product"] == "hypothetical protein":
                 self.names["product"] = ""
 
-        try:
-            #print(labelfilelocation)
-            lf = labelfilelocation[0]
-            if lf == "":
-                pass
-            else:
-                f = open(lf, "r")
-                match_names = [line.rstrip().split() for line in f]
-                match_dict = {}
-                for pair in match_names:
-                    match_dict[pair[0]] = (pair[1], pair[2])
-                f.close()
-                # query = match_names[0]
+        self.names["clear"] = ' ' # Blank label for the clear button
 
-                if names:
-                    self.names["psi_blast_match"] = None
-                    self.names["match_short"] = None
-                    self.names["match_very_short"] = None
-                    if "protein_id" in self.names:
-                        if self.names["protein_id"] in match_dict.keys():
-                            self.names["psi_blast_match"] = self.names["protein_id"] + ' (' + match_dict[
-                                self.names["protein_id"]][0] + ', ' + match_dict[self.names["protein_id"]][1] + ')'
-                            self.names["match_short"] = match_dict[self.names["protein_id"]][0] + " (" + match_dict[self.names["protein_id"]][1] + ")"
-                            self.names["match_very_short"] = match_dict[self.names["protein_id"]][0]
-                        else:
-                            self.names["psi_blast_match"] = None
-                            self.names["match_short"] = None
-                            self.names["match_very_short"] = None
-                    else:
-                        self.names["psi_blast_match"] = None
-                        self.names["match_short"] = None
-                        self.names["match_very_short"] = None
-                    if "product" in self.names:
-                        if self.names["product"] == "hypothetical protein":
-                            self.names["product"] = ""
+        if gnat_label:
+            labels = label_file_dict_container[0]["labels"]
+            if labels is not None:
+                self.names["psi_blast_match"] = None
+                self.names["match_short"] = None
+                self.names["match_very_short"] = None
 
-        except FileNotFoundError:
-            LOG.info("all_match_names.txt does not exist in this directory. gene['names']['psi_blast_match'] will "
-                     "always be false.")
-            self.names["psi_blast_match"] = None
-            self.names["match_short"] = None
-            self.names["match_very_short"] = None
-        except Exception as e:
-            LOG.info("Unknown exception occurred: %s." % e)
-            self.names["psi_blast_match"] = None
-            self.names["match_short"] = None
-            self.names["match_very_short"] = None
-        self.names["clear"] = ' '
+                if "protein_id" in self.names:
+                    if self.names["protein_id"] in labels:
+                        match_entry = labels[self.names["protein_id"]]
+                        match_label = match_entry[0]
+                        match_evalue = match_entry[1]
+
+                        self.names["psi_blast_match"] = f"{self.names['protein_id']} ({match_label}, {match_evalue})"
+                        self.names["match_short"] = f"{match_label} ({match_evalue})"
+                        self.names["match_very_short"] = match_label
+
+        # try:
+        #     lf = labelfilelocation[0]
+        #     if lf == "":
+        #         pass
+        #     else:
+
+        #         new_lf = False
+        #         with open(lf, "r") as f:
+
+        #             # Accession-label map
+        #             labels = {}
+
+        #             for i, line in enumerate(f):
+        #                 # Skip first line and trigger new lf_format flag if starts with #
+        #                 if i == 0 and line.startswith("#"):
+        #                     new_lf = True
+        #                     classes = [] # A list of the n label classes
+        #                     for j in range(3, len(line.split(",")), 2):
+        #                         classes.append({"name": line.split(",")[j], "label_map": {}}) # Each list contains the name of the class label (from the header) and a mapping of the accessions to the label and colour
+
+        #                     continue
+
+        #                 if new_lf:
+        #                     # Parse line as new csv format
+        #                     line = line.rstrip().split(",")
+
+        #                     accession = line[0]
+        #                     label = line[1]
+        #                     e_value = line[2]
+
+        #                     for j in range(3, len(line), 2):
+        #                         class_idx = (j - 3) // 2
+
+        #                         class_label = line[j]
+        #                         class_colour = line[j + 1]
+
+        #                         if accession in classes[class_idx]["label_map"]:
+        #                             # This case shouldn't happen (since there shouldn't be repeat accessions), if it does, we'll uuse the label and colour with the lower-evalue match
+        #                             print(f"WARNING: Accession {accession} is repeated in the label file. Using label and colour with the lower e-value. Existing label: {classes[class_idx]['label_map'][accession][0]}, Existing e-value: {classes[class_idx]['label_map'][accession][1]}, New label: {class_label}, New e-value: {e_value}")
+        #                             if e_value < classes[class_idx]["label_map"][accession][0][2]:
+        #                                 classes[class_idx]["label_map"][accession] = [(class_label, class_colour, e_value)]
+        #                         else:
+        #                             # Add the class, colour, and evalue to the label map
+        #                             classes[class_idx]["label_map"][line[j]] = [(class_label, class_colour, e_value)]
+                                
+
+        #                 else:
+        #                     # Parse line as old tsv format
+        #                     line = line.rstrip().split()
+                            
+        #                     accession = line[0]
+        #                     label = line[1]
+        #                     e_value = line[2]
+                        
+        #                 if accession in labels:
+        #                     # This case shouldn't happen (since there shouldn't be repeat accessions), if it does, we'll use the label and colour with the lower-evalue match
+        #                     print(f"WARNING: Accession {accession} is repeated in the label file. Using label and colour with the lower e-value. Existing label: {labels[accession][0]}, Existing e-value: {labels[accession][1]}, New label: {label}, New e-value: {e_value}")
+        #                     if e_value < labels[accession][2]:
+        #                         labels[accession] = (label, e_value)
+        #                 else:
+        #                     labels[accession] = (label, e_value)
+
+        #         # label_lines = [line.rstrip().split() for line in f]
+
+        #         # f = open(lf, "r")
+        #         # match_names = [line.rstrip().split() for line in f]
+        #         # match_dict = {}
+        #         # for pair in match_names:
+        #         #     match_dict[pair[0]] = (pair[1], pair[2])
+        #         # f.close()
+        #         # # query = match_names[0]
+
+        #         if names:
+        #             self.names["psi_blast_match"] = None
+        #             self.names["match_short"] = None
+        #             self.names["match_very_short"] = None
+        #             if "protein_id" in self.names:
+        #                 if self.names["protein_id"] in labels.keys():
+        #                     self.names["psi_blast_match"] = self.names["protein_id"] + ' (' + labels[
+        #                         self.names["protein_id"]][0] + ', ' + labels[self.names["protein_id"]][1] + ')'
+        #                     self.names["match_short"] = labels[self.names["protein_id"]][0] + " (" + labels[self.names["protein_id"]][1] + ")"
+        #                     self.names["match_very_short"] = labels[self.names["protein_id"]][0]
+        #                 else:
+        #                     self.names["psi_blast_match"] = None
+        #                     self.names["match_short"] = None
+        #                     self.names["match_very_short"] = None
+
+        #                 # Add class labels and colours
+        #                 self.class_labels = [None for _ in range(len(classes))]
+        #                 self.class_colours = [None for _ in range(len(classes))]
+
+        #                 for i in range(len(classes)):
+        #                     entry = classes[i]["label_map"].get(self.names["protein_id"], "None")
+        #                     if entry != "None":
+        #                         self.class_labels[i] = entry[0]
+        #                         self.class_colours[i] = entry[1]
+
+        #             else:
+        #                 self.names["psi_blast_match"] = None
+        #                 self.names["match_short"] = None
+        #                 self.names["match_very_short"] = None
+        #             if "product" in self.names:
+        #                 if self.names["product"] == "hypothetical protein":
+        #                     self.names["product"] = ""
+
+                
+
+        # except FileNotFoundError:
+        #     LOG.info("label file does not exist in this directory. gene['names']['psi_blast_match'] will "
+        #                 "always be false.")
+        #     self.names["psi_blast_match"] = None
+        #     self.names["match_short"] = None
+        #     self.names["match_very_short"] = None
+
+        # except Exception as e:
+        #     LOG.info("Unknown exception occurred: %s." % e)
+        #     self.names["psi_blast_match"] = None
+        #     self.names["match_short"] = None
+        #     self.names["match_very_short"] = None
+
+        # self.names["clear"] = ' '
+
 
     def to_dict(self):
         return {
@@ -563,12 +750,14 @@ class Gene(Serializer):
             record,
             start=None,
             end=None,
+            gnat_label=False,
     ):
         """Builds a new Gene object from a BioPython SeqFeature.
 
         Parameters:
             feature (SeqFeature): BioPython SeqFeature object
             record (SeqRecord): BioPython SeqRecord object (parent of feature)
+            gnat_label (bool): Whether to use GNAT labels
         """
         tags = ("protein_id", "locus_tag", "id", "gene", "label", "name")
         qualifiers = {
@@ -585,6 +774,7 @@ class Gene(Serializer):
             start=start if start else int(feature.location.start),
             end=end if end else int(feature.location.end),
             strand=feature.location.strand,
+            gnat_label=gnat_label,
         )
 
 
