@@ -6,6 +6,13 @@ POSITIONAL_ARGS=()
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+    -h|--help)
+      echo "Usage: run_clinker_main.sh [-p PLOTNAME] [-lf LABELFILE] [*.gb files]"
+      echo "  -p PLOTNAME: Name of the output plot file"
+      echo "  -lf LABELFILE: Name of the label file"
+      echo "  *.gb files: Genbank files to be processed"
+      exit 0
+      ;;
     -p)
       PLOTNAME="$2"
       shift
