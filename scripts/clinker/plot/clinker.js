@@ -596,68 +596,10 @@ function plot(data) {
     }
     fr.readAsText(document.getElementById("input-label-name-path").files[0]);
 
-        // let matchDict = {};
-        // let t = fr.result;
-        // let colourMaps = []; // List containing, for each class label type, a dictionary mapping the label to a hex colour
-        // let unColoureds = []; // List to contain, for each class label type, a list of the labels that don't have a colour assigned 
-        // let newFlag = false; // Flag to check if label file is in old format or new format
+    // Can add the class labelling stuff here TODO
 
-        // // Check if it's new format or old format (first character of first line is # in new format)
-        // let lines = t.split(/\r?\n/);
-        
-        // if (t[0] == "#") {
-        //   // New format (csv)
-        //   newFlag = true;
 
-        //   // Create an array of dictionaries to store the n class type dicts for each gene (where n is (len(splitLine) - 3 )/2)
-        //   // Each dictionary contains "name": the name on the header line, and "map": another dict mapping accessions to names
-        //   lineLen = lines[0].split(",").length;
-        //   numClasses = (lineLen - 3) / 2;
-        //   let classDicts = [];
-
-        //   for (let i = 3; i < lineLen; i+=2) {
-        //     classDicts.push({"name": lines[0].split(",")[i], "map": {}});
-        //     colourMaps.push([])
-        //     unColoureds.push([])
-        //   }
-
-        //   for (line of lines) {
-        //     // If line doesn't start with a #, split it and add to matchDict and classDicts
-        //     if (line[0] != "#") {
-        //       const splitLine = line.split(",");
-
-        //       let accession = splitLine[0];
-        //       let label = splitline[1];
-        //       let evalue = splitline[2];
-
-        //       matchDict[accession] = [label, evalue];
-
-        //       for (let i = 3; i < lineLine; i+=2) {
-        //         classIdx = (i - 3)/2;
-
-        //         let classNLabel = splitline[i];
-        //         let classNColour = splitline[i+1];
-
-        //         if (false) {// TODO: Check if classNLabel exists/if classNColour has been assigned
-        //           // If they haven't ignore the label/add classNColour to unColoureds[classIdx]
-        //         }
-
-        //         classDicts[classIdx][accession] = classNLabel
-        //         colourMaps[classIdx][accession] = classNColour
-        //       }
-        //     }
-        //   } 
-        // } else {
-        //   // Old format (tsv)
-        //   for (line of lines) {
-        //     const splitLine = line.split("\t");
-        //     if (splitLine.length == 3) {
-        //       matchDict[splitLine[0]] = [splitLine[1], splitLine[2]];
-        //     }
-        //   }
-        // }
-
-    })
+  });
   //-------------------------------------------------------------------------------------------------------------------
 
   // MODIFY GROUP LABELS ------------------------------------------------------------------------------------------------
