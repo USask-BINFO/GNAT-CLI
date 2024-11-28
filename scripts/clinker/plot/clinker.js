@@ -449,42 +449,214 @@ function plot(data) {
 
       let fr = new FileReader();
       fr.onload=function(){
-        let matchDict = {};
+        let accessions = {};
+        let isNew = false;
+        let header = "";
+        let startIdx = 0;
+        let classes = null;
+
         let t = fr.result;
         let lines = t.split(/\r?\n/);
-        for (line of lines) {
-          const splitLine = line.split("\t");
-          if (splitLine.length == 3) {
-            matchDict[splitLine[0]] = [splitLine[1], splitLine[2]]
+
+        if (t[0] == "#") {
+          // New format (csv)
+          isNew = true;
+          header = lines[0].split(",");
+          startIdx = 1;
+
+          // Create an array of dictionaries to store the n class type dicts for each gene (where n is (len(splitLine) - 3 )/2)
+          classes = [];
+
+          for (let i = 3; i < header.length; i+=2) {
+            classes.push({"label_name": header[i], "label_map": {}});
+          }
+        } else if (lines[0].split("\t").length != 3) {
+          // Not a valid label file (not new format b/c no header, not old format b/c not 3 tsv columns)
+          alert("Invalid label file. Please ensure it is in the correct format.");
+          return;
+        }
+
+        for (let i = startIdx; i < lines.length; i++) {
+          if (isNew) {
+            // New format (csv, has header and >=3 columns)
+            let splitLine = lines[i].split(",");
+            let replaceDupe = false; // Flag to replace duplicate accessions' class labels with the lower e-value's ones
+
+            let accession = splitLine[0];
+            let label = splitLine[1];
+            let evalue = splitLine[2];
+
+            if (accession in accessions) {
+              if (accessions[accession][1] > evalue) {
+                replaceDupe = true;
+                oldClasses = accessions[accession][2];
+                accessions[accession] = [label, evalue, splitLine.slice(3,)];
+              } else {
+                continue;
+              }
+            } else {
+              accessions[accession] = [label, evalue, splitLine.slice(3,)];
+            }
+
+            if (replaceDupe) {
+              for (let j=0; j < oldClasses.length; j++) {
+                let classIdx = j/2;
+                let classLabel = oldClasses[j];
+
+                if (splitLine[j+3] != "" && accession in classes[classIdx]["label_map"][classLabel]["accessions"]) {
+                  classes[classIdx]["label_map"][classLabel]["accessions"] = classes[classIdx]["label_map"][classLabel]["accessions"].filter(acc => acc !== accession);
+                }
+              }
+            }
+
+            for (let j=3; j < splitLine.length; j+=2) {
+              let classIdx = (j - 3)/2;
+              let classLabel = splitLine[j];
+              let classColour = splitLine[j+1];
+
+              if (classLabel in classes[classIdx]["label_map"]) {
+                // Class label already exists, add accession to it (and make sure the colour is the same)
+                if (classColour != classes[classIdx]["label_map"][classLabel]["colour"]) {
+                  alert("Error: Class label " + classLabel + " has multiple colours assigned to it. Please ensure each label has only one colour. Using the first one in the label file.");
+                }
+
+                // Double check that the accession isn't already in the class label (if it is, something is wrong)
+                if (accession in classes[classIdx]["label_map"][classLabel]["accessions"]) {
+                  alert("Error: Accession " + accession + " is already assigned to class label " + classLabel + ". Please ensure each accession is only assigned to one class label. If this error occurred, something is very wrong");
+                  return;
+                }
+                classes[classIdx]["label_map"][classLabel]["accessions"].push(accession);
+              } else {
+                classes[classIdx]["label_map"][classLabel] = {"colour": classColour, "accessions": [accession]};
+              }
+            }
+          } else {
+            // Old format
+            let splitLine = lines[i].split("\t");
+
+            let accession = splitLine[0];
+            let label = splitLine[1];
+            let evalue = splitLine[2];
+
+            if (accession in accessions) {
+              if (accessions[accession][1] > evalue) {
+                accessions[accession] = [label, evalue];
+              }
+          } else {
+            accessions[accession] = [label, evalue];
           }
         }
-        for (cluster of data.clusters) {
-          for (locus of cluster.loci) {
-            for (gene of locus.genes) {
-              let flag = false;
-              if ("protein_id" in gene.names) {
-                if (gene.names["protein_id"] in matchDict) {
-                  const pId = gene.names["protein_id"]
-                  gene.names["dynamic_match"] = pId + " (" + matchDict[pId][0] + ", " + matchDict[pId][1] + ")";
-                  gene.names["dynamic_short"] = matchDict[pId][0] + " (" + matchDict[pId][1] + ")";
-                  gene.names["dynamic_very_short"] = matchDict[pId][0]
-                } else { flag = true }
+      }
+
+      let label_obj = {"isNew": isNew, "labels": accessions, "class_labels": classes};
+
+      // Assign the labels to the genes
+      let matchDict = label_obj["labels"];
+
+      for (cluster of data.clusters) {
+        for (locus of cluster.loci) {
+          for (gene of locus.genes) {
+            let flag = false;
+            if ("protein_id" in gene.names) {
+              if (gene.names["protein_id"] in matchDict) {
+                const pId = gene.names["protein_id"]
+                gene.names["dynamic_match"] = pId + " (" + matchDict[pId][0] + ", " + matchDict[pId][1] + ")";
+                gene.names["dynamic_short"] = matchDict[pId][0] + " (" + matchDict[pId][1] + ")";
+                gene.names["dynamic_very_short"] = matchDict[pId][0]
+                // if (newFlag) {
+                //   // Testing for the new labelling
+                //   for (let i=0; i < classDicts.length; i++) {
+                //     if (gene.names["protein_id"] in classDicts[i]) {
+                //       gene.names["class_"+i+"_label"] = classDicts[i][gene.names["protein_id"]]
+                //       gene.names["class_"+i+"_colour"] = colourMaps[i][gene.names["protein_id"]]
+                //     }
+                //   }
+                // }
               } else { flag = true }
-              if (flag) {
-                gene.names["dynamic_match"] = "";
-                gene.names["dynamic_short"] = "";
-                gene.names["dynamic_very_short"] = "";
-              }
+            } else { flag = true }
+            if (flag) {
+              gene.names["dynamic_match"] = "";
+              gene.names["dynamic_short"] = "";
+              gene.names["dynamic_very_short"] = "";
+              // if (newFlag) {
+              //   for (let i=0; i < classDicts.length; i++) {
+              //     gene.names["class_"+i+"_label"] = "";
+              //     gene.names["class_"+i+"_colour"] = "";
+              //   }
+              // }
             }
           }
         }
-        d3.selectAll("text.geneLabel").each(d => d.label = " ");
-        let e = document.getElementById("select-label-type");
-        let type = e.options[e.selectedIndex].value;
-        d3.selectAll("text.geneLabel").each(d => d.label = d.names[type] ? d.names[type] : d.label)
-        plot.call(chart);
       }
-      fr.readAsText(document.getElementById("input-label-name-path").files[0]);
+      d3.selectAll("text.geneLabel").each(d => d.label = " ");
+      let e = document.getElementById("select-label-type");
+      let type = e.options[e.selectedIndex].value;
+      d3.selectAll("text.geneLabel").each(d => d.label = d.names[type] ? d.names[type] : d.label)
+      plot.call(chart);
+    }
+    fr.readAsText(document.getElementById("input-label-name-path").files[0]);
+
+        // let matchDict = {};
+        // let t = fr.result;
+        // let colourMaps = []; // List containing, for each class label type, a dictionary mapping the label to a hex colour
+        // let unColoureds = []; // List to contain, for each class label type, a list of the labels that don't have a colour assigned 
+        // let newFlag = false; // Flag to check if label file is in old format or new format
+
+        // // Check if it's new format or old format (first character of first line is # in new format)
+        // let lines = t.split(/\r?\n/);
+        
+        // if (t[0] == "#") {
+        //   // New format (csv)
+        //   newFlag = true;
+
+        //   // Create an array of dictionaries to store the n class type dicts for each gene (where n is (len(splitLine) - 3 )/2)
+        //   // Each dictionary contains "name": the name on the header line, and "map": another dict mapping accessions to names
+        //   lineLen = lines[0].split(",").length;
+        //   numClasses = (lineLen - 3) / 2;
+        //   let classDicts = [];
+
+        //   for (let i = 3; i < lineLen; i+=2) {
+        //     classDicts.push({"name": lines[0].split(",")[i], "map": {}});
+        //     colourMaps.push([])
+        //     unColoureds.push([])
+        //   }
+
+        //   for (line of lines) {
+        //     // If line doesn't start with a #, split it and add to matchDict and classDicts
+        //     if (line[0] != "#") {
+        //       const splitLine = line.split(",");
+
+        //       let accession = splitLine[0];
+        //       let label = splitline[1];
+        //       let evalue = splitline[2];
+
+        //       matchDict[accession] = [label, evalue];
+
+        //       for (let i = 3; i < lineLine; i+=2) {
+        //         classIdx = (i - 3)/2;
+
+        //         let classNLabel = splitline[i];
+        //         let classNColour = splitline[i+1];
+
+        //         if (false) {// TODO: Check if classNLabel exists/if classNColour has been assigned
+        //           // If they haven't ignore the label/add classNColour to unColoureds[classIdx]
+        //         }
+
+        //         classDicts[classIdx][accession] = classNLabel
+        //         colourMaps[classIdx][accession] = classNColour
+        //       }
+        //     }
+        //   } 
+        // } else {
+        //   // Old format (tsv)
+        //   for (line of lines) {
+        //     const splitLine = line.split("\t");
+        //     if (splitLine.length == 3) {
+        //       matchDict[splitLine[0]] = [splitLine[1], splitLine[2]];
+        //     }
+        //   }
+        // }
+
     })
   //-------------------------------------------------------------------------------------------------------------------
 
