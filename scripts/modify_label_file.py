@@ -5,6 +5,7 @@ Can also be used to change the name of matches in the label file (e.g., rename a
 """
 import argparse
 from sys import stdout
+from label_cls import LabelObject
 
 # Parse arguments
 parser = argparse.ArgumentParser("Update the label file used for match names in the clinker plots.")
@@ -16,55 +17,152 @@ parser.add_argument("-o", "--out", help="Path and name of the output file when -
 
 args = parser.parse_args()
 
-# Functions for updating/modifying the label file
-def update_label_lines(label_data, parsed_lines):
-    """
-    Updates the existing label file lines based on the provided parsed output file.
-    If a match in the parsed file is already in the label file, the one with the lower e-value will be used.
-    If the e-values are the same, the match in the label file will be retained.
-    All other matches in the parsed file will be appended to the label lines.
-    :param label_data: list of dicts from 'label_file', with a sublist for each of 'match_names', 'query_names', and 'e_values'
-    :param parsed_lines: list of lists from 'parsed', where each sublist is in the format [match_name, query_name, e_value]
-    return: None, modifies label_lines list
-    """
-    for line in parsed_lines:
-        if line[0] in label_data['match_names']:
-            dupe_index = label_data['match_names'].index(line[0])
-            # If match already in label file, keep the one with the lower e-value
-            if float(line[2]) < float(label_data['e_values'][dupe_index]):
-                label_data['e_values'][dupe_index] = line[2]
-                label_data['query_names'][dupe_index] = line[1]
-        else:
-            # If match not in label file, add it
-            label_data['match_names'].append(line[0])
-            label_data['query_names'].append(line[1])
-            label_data['e_values'].append(line[2])
+# def read_label_file(label_file):
+#     """
+#     Reads the label file and returns the lines as a list.
+    
+#     :param label_file: Path to the label file.
+    
+#     return: List of label file lines.
+#     """
+#     try:
+#         with open(label_file, "r") as f:
+#             return f.readlines()
+#     except FileNotFoundError:
+#         raise FileNotFoundError(f"Label file {label_file} not found. Please check the path and try again.")
+    
+# def is_new_format(label_lines):
+#     """
+#     Check if the label file is in the old or new format.
+#     Old format is tab-delimited and has the format:
+#       accession   label   e_value
+#     New format starts with a header line beginning with #, is comma-delimited, and has the format:
+#       accession,label,e_value,group1_name,group1_colours,group2_name,group2_colours,...,groupN_name,groupN_colours
+#       Where all items after [2] are optional.
 
-def modify_label_names(label_data, modifications):
-    """
-    Modifies the match names in the label file based on the mapping provided in modifications.
-    :param label_data: list of dicts from 'label_file', with a sublist for each of 'match_names', 'query_names', and 'e_values'
-    :param modifications: list of lists from 'modify', where each sublist is in the format [old_label, new_label]
-    :return: A modified version of the label_lines list
-    """
-    copied_query_lines = [i for i in label_data['query_names']]
-    for i in range(len(copied_query_lines)):
-        for line in modifications:
-            if line[0] == copied_query_lines[i]:
-                copied_query_lines[i] = line[1]
-    return {'match_names': label_data['match_names'], 'query_names': copied_query_lines, 'e_values': label_data['e_values']}
-                
+#     :param label_lines: List of label file lines from read_label_file.
+    
+#     return: True if new format, False if old format. Raises ValueError if neither format is detected.
+#     """
+#     if label_lines[0][0] == '#':
+#         return True
+#     elif len(label_lines[0].split()) == 3:
+#         return False
+#     else:
+#         raise ValueError("Label file is not in the expected format. Does not start with a header line, indicative of the new format, but also does not split into 3 items on whitespace. Please check the file and try again.")
+
+# def parse_existing_label_lines(label_lines):
+#     """
+#     Parse the existing label file lines (either new or old format).
+#     New format starts with a header line beginning with #, is comma-delimited, and has the format:
+#       accession,label,e_value,group1_name,group1_colours,group2_name,group2_colours,...,groupN_name,groupN_colours
+#     Where all items after [2] are optional.
+#     Old format is tab-delimited and has the format:
+#       accession   label   e_value
+
+#     :param label_lines: List of label file lines.
+    
+#     return: Dict {'is_new': bool, 
+#                   'labels': {str accession: (str label, str e_value, [split_line[3:] if is_new]), 
+#                              ...}, 
+#                   'class_labels': [
+#                         {'label_name': str, 
+#                          'label_map': {str label: {'accessions': [acc1, acc2, ..., accN], 
+#                                                    'colour': str}, 
+#                                        ...}, 
+#                         }, ..., (for the N groups/classes)
+#                         ] OR None if not is_new
+#                   }
+#     """
+#     accessions = {}
+#     is_new = False
+
+#     for i, line in enumerate(label_lines):
+        
+#         # Skip header line if new format
+#         if i == 0 and line[0] == '#':
+#             is_new = True
+#             classes = [] # Init a list to store the n class types
+
+#             for j in range(3, len(line.split(",")), 2):
+#                 classes.append({'label_name': line.split(",")[j], 'label_map': {}})
+#             continue
+#         elif i == 0 and line[0] != '#':
+#             # Make sure it's in the old format if the first line isn't a header
+#             if not len(line.split()) == 3:
+#                 raise ValueError("Label file is not in the expected format. Please check the file and try again.")
+        
+#         if is_new:
+#             # Parse lines in new format
+#             line = line.strip().split(",")
+#             replace_dupe = False # Flag to replace duplicate accessions' class labels with the lower e-value's ones
+
+#             accession, label, e_value = line[:3]
+
+#             if accessions.get(accession, None) is not None:
+#                 pass
+
+
+# # Functions for updating/modifying the label file
+# def update_label_lines(label_data, parsed_lines):
+#     """
+#     Updates the existing label file lines based on the provided parsed output file.
+#     If a match in the parsed file is already in the label file, the one with the lower e-value will be used.
+#     If the e-values are the same, the match in the label file will be retained.
+#     All other matches in the parsed file will be appended to the label lines.
+#     :param label_data: list of dicts from 'label_file', with a sublist for each of 'match_names', 'query_names', and 'e_values'
+#     :param parsed_lines: list of lists from 'parsed', where each sublist is in the format [match_name, query_name, e_value]
+#     return: None, modifies label_lines list
+#     """
+#     for line in parsed_lines:
+#         # if len(line) == 4:
+#         #     group = line[3]
+#         # else:
+#         #     group = None
+
+#         if line[0] in label_data['match_names']:
+#             dupe_index = label_data['match_names'].index(line[0])
+#             # If match already in label file, keep the one with the lower e-value
+#             if float(line[2]) < float(label_data['e_values'][dupe_index]):
+#                 label_data['e_values'][dupe_index] = line[2]
+#                 label_data['query_names'][dupe_index] = line[1]
+#                 # label_data['group'][dupe_index] = group
+#         else:
+#             # If match not in label file, add it
+#             label_data['match_names'].append(line[0])
+#             label_data['query_names'].append(line[1])
+#             label_data['e_values'].append(line[2])
+#             # label_data['group'].append(group)
+
+
+# def modify_label_names(label_data, modifications):
+#     """
+#     Modifies the match names in the label file based on the mapping provided in modifications.
+#     :param label_data: list of dicts from 'label_file', with a sublist for each of 'match_names', 'query_names', and 'e_values' (and 'group')
+#     :param modifications: list of lists from 'modify', where each sublist is in the format [old_label, new_label]
+#     :return: A modified version of the label_lines list
+#     """
+#     copied_query_lines = [i for i in label_data['query_names']]
+#     for i in range(len(copied_query_lines)):
+#         for line in modifications:
+#             if line[0] == copied_query_lines[i]:
+#                 copied_query_lines[i] = line[1]
+#     return {'match_names': label_data['match_names'], 'query_names': copied_query_lines, 'e_values': label_data['e_values']}#, 'group': label_data['group']}
 
 # Read label file into a dict of 3 sublists of the same length (length=number of label file lines) where
 # the first sublist is a list of match names, the second sublist is a list of query names, and the third
 # sublist is a list of e-values. The indices of each sublist correspond to the same match.
 with open(args.label_file, "r") as f:
-    label_file_data = {'match_names': [], 'query_names': [], 'e_values': []}
+    label_file_data = {'match_names': [], 'query_names': [], 'e_values': []}#, 'group': []}
     for line in f:
         splitline = line.rstrip().split()
         label_file_data['match_names'].append(splitline[0])
         label_file_data['query_names'].append(splitline[1])
         label_file_data['e_values'].append(splitline[2])
+        # if len(splitline) > 3:
+        #     label_file_data['group'].append(splitline[3])
+        # else:
+        #     label_file_data['group'].append(None)
 
 # Verify either parsed or modify file was provided
 if not args.parsed and not args.modify:
