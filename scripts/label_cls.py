@@ -84,9 +84,15 @@ class LabelObject:
         accession, label, e_value = split_line[:3]
         replace_dupe = False
 
+        # print(f"Adding line: {split_line}")
+
         if self.is_new:
             # Add line in new format
             if accession in self.accessions:
+                if len(split_line[3:]) != 2 * self.num_classes:
+                    # Pad with blanks
+                    split_line += ["" for _ in range(2 * self.num_classes - len(split_line[3:]))]
+
                 # Accession already exists, update label and e_value with the lower of the two e_values
                 if Decimal(e_value) < Decimal(self.accessions[accession][1]):
                     replace_dupe = True
@@ -110,7 +116,7 @@ class LabelObject:
                     while accession in self.classes[class_idx]["label_map"][class_label]["accessions"]:
                         self.classes[class_idx]["label_map"][class_label]["accessions"].remove(accession)
 
-            for j in range(3, len(split_line, 2)):
+            for j in range(3, len(split_line), 2):
                 class_idx = (j - 3) // 2
 
                 class_label = split_line[j]
@@ -153,7 +159,19 @@ class LabelObject:
 
         self.add_line([accession, label, e_value])
 
-
+    def merge_parsed_psi_file(self, parsed_location):
+        """
+        Merge parsed PSI-BLAST output lines with the label object.
+        :param parsed_location: The location of the parsed PSI-BLAST output file.
+        """
+        try:
+            with open(parsed_location, 'r') as f:
+                parsed_lines = f.readlines()
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Parsed PSI-BLAST output file {parsed_location} not found. Please check the path and try again.")
+        
+        for line in parsed_lines:
+            self.add_parsed_line(line.split())
 
     def __str__(self):
         """
@@ -165,11 +183,14 @@ class LabelObject:
             for accession in self.accessions:
                 label_str += f"{accession},{self.accessions[accession][0]},{self.accessions[accession][1]}"
                 for class_idx in range(len(self.classes)):
+                    add_flag = False
                     for class_label in self.classes[class_idx]["label_map"]:
                         if accession in self.classes[class_idx]["label_map"][class_label]["accessions"]:
                             label_str += f",{class_label},{self.classes[class_idx]['label_map'][class_label]['colour']}"
-                        else:
-                            label_str += ",,"
+                            add_flag = True
+                            break
+                    if not add_flag:
+                        label_str += ",,"
                 label_str += "\n"
         else:
             # Old format
@@ -177,7 +198,7 @@ class LabelObject:
             for accession in self.accessions:
                 label_str += f"{accession}\t{self.accessions[accession][0]}\t{self.accessions[accession][1]}\n"
 
-        return label_str.rstrip() # Remove trailing newline
+        return label_str
     
     def propagate_class_labels(self, text_label, class_level, class_label, class_colour):
         """
@@ -211,6 +232,11 @@ class LabelObject:
             # New format
             self.num_classes += 1
             self.classes.append({"label_name": class_label, "label_map": {}})
+            self.header += f",{class_label},{class_label}_colour"
+
+            for accession in self.accessions:
+                self.accessions[accession][2].append(",,")
+
         else:
             # Old format
             print(f"Warning: Adding class levels is not supported for old format label files. Skipping addition of class level '{class_label}'.")
@@ -271,10 +297,15 @@ class LabelObject:
             # New format, re-assign the colours
             if class_idx is None:
                 for i in range(len(self.classes)):
-                    self.classes[i]["label_map"] = self.re_assign_colours(i)
+                    self.re_assign_colours(i)
             else:
                 # Re-assign colours for a specific class level
                 class_labels = list(self.classes[class_idx]["label_map"].keys())
+                # removed_blanks = []
+                for blank in ["", "None"]:
+                    if blank in class_labels:
+                        class_labels.remove(blank)
+                        # removed_blanks.append(blank)
                 colours = self.colour_picker(len(class_labels))
 
                 for i in range(len(class_labels)):
@@ -345,12 +376,117 @@ class LabelObject:
             if accession in self.accessions:
                 self.accessions[accession][0] = new_label
 
+    def merge_label_file(self, new_label_file):
+        """
+        Merge a new label file with the current label object. Merged file will be in same format as old label object.
+        :param new_label_file: The path to the new label file to merge.
+        """
+        # TODO DOUBLE CHECK THIS WORKS
+        new_label_obj = LabelObject()
+        new_label_obj.from_file(new_label_file)
+
+        new_label_fmt = new_label_obj.is_new
+        old_label_fmt = self.is_new
+
+        if new_label_fmt != old_label_fmt:
+            new_label_obj.switch_format()
+
+        if old_label_fmt:
+            # New format
+            # Find how many new classes there are
+            new_classes = [class_label["label_name"] for class_label in new_label_obj.classes]
+            old_classes = [class_label["label_name"] for class_label in self.classes]
+
+            index_map = {}
+            counter = len(old_classes)
+            for i, c in enumerate(new_classes):
+                if c not in old_classes:
+                    index_map[i] = counter
+                    counter += 1
+                else:
+                    index_map[i] = old_classes.index(c)
+
+            unique_new_classes = [(i, c) for i, c in enumerate(new_classes) if c not in old_classes]
+            for i, c in unique_new_classes:
+                # Add the new class level for each new class
+                self.add_class_level(c)
+
+            # Loop through the accessions to add them to the old label object
+            for accession in new_label_obj.accessions:
+                # Rebuild the line to add to the old label object
+                new_label_line = [accession, new_label_obj.accessions[accession][0], new_label_obj.accessions[accession][1]]
+
+                # Pad the line with blanks for the new total number of classes
+                new_label_line += ["" for _ in range(2 * len(self.classes) - len(new_label_line[3:]))]
+
+                line_new_classes = new_label_obj.accessions[accession][2]
+                # Remap these new classes to the mapping
+                for i in range(0, len(line_new_classes), 2):
+                    print(line_new_classes)
+                    j = i // 2
+                    class_idx = index_map[j]
+                    line_idx = 3 + 2 * class_idx
+                    new_label_line[line_idx] = line_new_classes[i]
+                    new_label_line[line_idx + 1] = self.colour_picker(1)[0]
+
+                self.add_line(new_label_line)
+            
+            # Re-assign colours to the class levels
+            self.re_assign_colours()
+
+        else:
+            # Old format
+            for accession in new_label_obj.accessions:
+                self.add_line([accession, new_label_obj.accessions[accession][0], new_label_obj.accessions[accession][1]])
+
+
+
+    def switch_format(self):
+        """
+        Converts the label object to the opposite format. (Note that this will lose information if converting from new to old).
+        """
+        self.is_new = not self.is_new
+        if self.is_new:
+            # Convert to new format
+            self.header = "#accession,label,e_value"
+            self.num_classes = 0
+            self.classes = []
+            
+            for accession in self.accessions:
+                self.accessions[accession].append([])
+
+        else:
+            # Convert to old format
+            self.header = None
+            self.num_classes = 0
+            self.classes = None
+
+            for accession in self.accessions:
+                self.accessions[accession] = self.accessions[accession][:2]
+
+
+
 if __name__ == "__main__":
     # Testing
-    label_obj = LabelObject()
+    label_obj_1 = LabelObject()
+    label_obj_1.from_file("lf_testing/l1_new.label")
+    print(label_obj_1)
+    print(label_obj_1.classes)
+    print(label_obj_1.accessions)
 
-    print(label_obj.accessions)
-    print(label_obj.classes)
-    print(label_obj.header)
-    print(label_obj.num_classes)
+    print("\n\n")
+
+    label_obj_2 = LabelObject()
+    label_obj_2.from_file("lf_testing/l2_new.label")
+    print(label_obj_2)
+    print(label_obj_2.classes)
+    print(label_obj_2.accessions)
+
+    print("\n\n")
+
+    label_obj_1.merge_label_file("lf_testing/l2_new.label")
+    print(label_obj_1)
+    print(label_obj_1.classes)
+    print(label_obj_1.accessions)
+
     pass
