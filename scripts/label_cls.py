@@ -40,7 +40,7 @@ class LabelObject:
         if label_lines[0].startswith("#"):
             return True
         else:
-            if len(label_lines[0].strip().split('\t')) == 3:
+            if len(label_lines[0].strip().split()) == 3:
                 return False
             else:
                 raise ValueError("Label file is not in the new or old format. Please check the file and try again. (First label line does not start with #, but label lines are also not 3 tab-delimited items.)")
@@ -74,7 +74,7 @@ class LabelObject:
         self.classes = None
 
         for line in label_lines:
-            split_line = line.strip().split('\t')
+            split_line = line.strip().split()
             self.add_line(split_line)
 
     def add_line(self, split_line):
@@ -453,7 +453,8 @@ class LabelObject:
             self.classes = []
             
             for accession in self.accessions:
-                self.accessions[accession].append([])
+                old_tuple = self.accessions[accession]
+                self.accessions[accession] = [old_tuple[0], old_tuple[1], []]
 
         else:
             # Convert to old format
@@ -462,31 +463,76 @@ class LabelObject:
             self.classes = None
 
             for accession in self.accessions:
-                self.accessions[accession] = self.accessions[accession][:2]
+                old_list = self.accessions[accession]
+                self.accessions[accession] = (old_list[0], old_list[1])
 
 
 
 if __name__ == "__main__":
     # Testing
+    print("Reading LF 1")
     label_obj_1 = LabelObject()
-    label_obj_1.from_file("lf_testing/l1_new.label")
+    label_obj_1.from_file("/home/njt694/gnat/utils/AcrVis/scripts/lf_testing/l1_new.label")
     print(label_obj_1)
     print(label_obj_1.classes)
     print(label_obj_1.accessions)
 
     print("\n\n")
+    print("Reading LF 2")
 
     label_obj_2 = LabelObject()
-    label_obj_2.from_file("lf_testing/l2_new.label")
+    label_obj_2.from_file("/home/njt694/gnat/utils/AcrVis/scripts/lf_testing/l2_new.label")
     print(label_obj_2)
     print(label_obj_2.classes)
     print(label_obj_2.accessions)
 
     print("\n\n")
+    print("Merging LF 2 into LF 1")
 
-    label_obj_1.merge_label_file("lf_testing/l2_new.label")
+    label_obj_1.merge_label_file("/home/njt694/gnat/utils/AcrVis/scripts/lf_testing/l2_new.label")
     print(label_obj_1)
     print(label_obj_1.classes)
     print(label_obj_1.accessions)
 
+    print("\n\n")
+    print("Switching LF 1 format")
+
+    label_obj_1.switch_format()
+    print(label_obj_1)
+    print(label_obj_1.classes)
+    print(label_obj_1.accessions)
+
+    print("\n\n")
+    print("Reading LF 3 (old fmt)")
+
+    label_obj_3 = LabelObject()
+    label_obj_3.from_file("/home/njt694/gnat/utils/AcrVis/scripts/lf_testing/l3_old.label")
+    print(label_obj_3)
+    print(label_obj_3.classes)
+    print(label_obj_3.accessions)
+
+    print("\n\n")
+    print("Switching LF 3 format")
+
+    label_obj_3.switch_format()
+    print(label_obj_3)
+    print(label_obj_3.classes)
+    print(label_obj_3.accessions)
+
+    print("\n\n")
+    print("Adding class level to LF 3")
+
+    label_obj_3.add_class_level("new_class")
+    print(label_obj_3)
+    print(label_obj_3.classes)
+    print(label_obj_3.accessions)
+
+    print("\n\n")
+    print("Adding class label to LF 3 Cas1f")
+
+    label_obj_3.propagate_class_labels("Cas1f", 0, "new_class", "#FF0000")
+
+    print(label_obj_3)
+    print(label_obj_3.classes)
+    print(label_obj_3.accessions)
     pass
