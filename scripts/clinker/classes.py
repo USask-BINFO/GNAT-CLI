@@ -28,7 +28,7 @@ FASTA_SUFFIXES = (".fa", ".fsa", ".fna", ".fasta", ".faa")
 GBK_SUFFIXES = (".gbk", ".gb", ".genbank", ".gbf", ".gbff")
 GFF_SUFFIXES = (".gtf", ".gff", ".gff3")
 
-label_file_dict_container = [None]
+label_obj_container = [None]
 
 def find_fasta(gff_path):
     path = None
@@ -490,21 +490,38 @@ class Gene(Serializer):
         self.names["clear"] = ' ' # Blank label for the clear button
 
         if gnat_label:
-            labels = label_file_dict_container[0]["labels"]
-            if labels is not None:
+            label_obj = label_obj_container[0]
+            accession_dict = label_obj.accessions
+            if accession_dict is not None:
                 self.names["psi_blast_match"] = None
                 self.names["match_short"] = None
                 self.names["match_very_short"] = None
+                self.classes = None
 
                 if "protein_id" in self.names:
-                    if self.names["protein_id"] in labels:
-                        match_entry = labels[self.names["protein_id"]]
+                    if self.names["protein_id"] in accession_dict:
+                        match_entry = accession_dict[self.names["protein_id"]]
                         match_label = match_entry[0]
                         match_evalue = match_entry[1]
 
                         self.names["psi_blast_match"] = f"{self.names['protein_id']} ({match_label}, {match_evalue})"
                         self.names["match_short"] = f"{match_label} ({match_evalue})"
                         self.names["match_very_short"] = match_label
+
+                    if label_obj.is_new:
+                        # Label file in new format, may be class labels
+                        if label_obj.classes is not None:
+                            self.classes = {}
+                            for i, class_dict in enumerate(label_obj.classes):
+                                class_name = class_dict["label_name"]
+                                class_map = class_dict["label_map"]
+
+                                for sub_label in class_map:
+                                    if self.names["protein_id"] in class_map[sub_label]["accessions"]:
+                                        self.classes[class_name] = (sub_label, class_map[sub_label]["colour"])
+
+
+                
 
     def to_dict(self):
         return {

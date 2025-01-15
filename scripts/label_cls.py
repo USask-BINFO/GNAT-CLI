@@ -173,10 +173,14 @@ class LabelObject:
         for line in parsed_lines:
             self.add_parsed_line(line.split())
 
-    def __str__(self):
+    def __str__(self, fmt="new"):
         """
         Convert the label object to a string of label file lines.
         """
+        fmt = fmt == "new"
+        if fmt != self.is_new:
+            self.switch_format()
+            
         if self.is_new:
             # New format
             label_str = f"{self.header}\n"
