@@ -496,30 +496,33 @@ class Gene(Serializer):
                 self.names["psi_blast_match"] = None
                 self.names["match_short"] = None
                 self.names["match_very_short"] = None
-                self.classes = None
+                class_labels = {}
+                
+
+                if label_obj.classes:
+                    for i, c in enumerate(label_obj.classes):
+                        class_labels[c["label_name"]] = (i, None)
+
 
                 if "protein_id" in self.names:
-                    if self.names["protein_id"] in accession_dict:
-                        match_entry = accession_dict[self.names["protein_id"]]
+                    accession = self.names["protein_id"]
+                    if accession in accession_dict:
+                        match_entry = accession_dict[accession]
                         match_label = match_entry[0]
                         match_evalue = match_entry[1]
+                        sub_labels = [match_entry[2][l] for l in range(len(match_entry[2])) if l % 2 == 0]
+                        # print(sub_labels)
 
-                        self.names["psi_blast_match"] = f"{self.names['protein_id']} ({match_label}, {match_evalue})"
+                        self.names["psi_blast_match"] = f"{accession} ({match_label}, {match_evalue})"
                         self.names["match_short"] = f"{match_label} ({match_evalue})"
                         self.names["match_very_short"] = match_label
 
-                    if label_obj.is_new:
-                        # Label file in new format, may be class labels
-                        if label_obj.classes is not None:
-                            self.classes = {}
-                            for i, class_dict in enumerate(label_obj.classes):
-                                class_name = class_dict["label_name"]
-                                class_map = class_dict["label_map"]
-
-                                for sub_label in class_map:
-                                    if self.names["protein_id"] in class_map[sub_label]["accessions"]:
-                                        self.classes[class_name] = (sub_label, class_map[sub_label]["colour"])
-
+                        # Add custom labels as text to names
+                        for label_name in class_labels:
+                            idx = class_labels[label_name][0]
+                            if sub_labels[idx] not in [None, '']:
+                                colour = label_obj.classes[idx]["label_map"][sub_labels[idx]]["colour"]
+                                self.names[f"{label_name}_(custom_{str(idx)})"] = f"{sub_labels[idx]} ({colour})"
 
                 
 

@@ -58,93 +58,6 @@ def parse_gnat_label_file(label_file_location=None):
         lf_object = LabelObject()
         lf_object.from_file(label_file_location)
         return lf_object
-        # with open(label_file_location, "r") as f:
-        #     accessions = {}
-        #     is_new = False
-
-        #     for i, line in enumerate(f):
-
-        #         # Skip header line if file is in new format
-        #         if i == 0 and line.startswith("#"):
-        #             is_new = True
-        #             classes = [] # Init a list to store the n class types
-
-        #             for j in range(3, len(line.split(",")), 2):
-        #                 classes.append({"label_name": line.split(",")[j], "label_map": {}})
-        #             continue
-
-        #         elif i == 0 and not line.startswith("#"):
-        #             # Make sure it's in the old format if the first line isn't a header
-        #             if not len(line.split()) == 3:
-        #                 LOG.warning("Label file does not start with a header line (as expected for a new format file), but also does not contain the expected 3 tab-delimited columns expected of the old format. GNAT labelling will not be enabled.")
-        #                 return None
-
-
-        #         if is_new:
-        #             # Parse lines in new format
-        #             line = line.strip().split(",")
-        #             replace_dupe = False # Flag to replace duplicate accessions' class labels with the lower e-value's ones
-
-        #             accession, label, e_value = line[0], line[1], line[2]
-
-        #             if accessions.get(accession, None) is not None:
-        #                 LOG.warning(f"Duplicate accession found in label file: {accession}. The one with the lower E-value will be used.")
-        #                 if Decimal(e_value) < Decimal(accessions[accession][1]):
-        #                     replace_dupe = True
-        #                     old_classes = accessions[accession][2]
-        #                     accessions[accession] = [label, e_value, line[3:]]
-        #                 else:
-        #                     continue
-        #             else:
-        #                 accessions[accession] = [label, e_value, line[3:]]
-
-        #             if replace_dupe:
-        #                 # Remove accession from old class label
-        #                 for j in range(0, len(old_classes), 2):
-        #                     class_idx = j // 2
-        #                     class_label = old_classes[j]
-
-        #                     while accession in classes[class_idx]["label_map"][class_label]["accessions"]:
-        #                         classes[class_idx]["label_map"][class_label]["accessions"].remove(accession)
-
-        #             for j in range(3, len(line), 2):
-        #                 class_idx = (j - 3) // 2
-
-        #                 class_label = line[j]
-        #                 class_colour = line[j+1]
-
-        #                 if class_label not in classes[class_idx]["label_map"]:
-        #                     classes[class_idx]["label_map"][class_label] = {"accessions": [accession], "colour": class_colour}
-
-        #                 else:
-        #                     # Class label already exists, add accession to it (and make sure the colour is the same)
-        #                     if class_colour != classes[class_idx]["label_map"][class_label]["colour"]:
-        #                         LOG.warning(f"Class label '{class_label}' has multiple colours in label file (new colour: {class_colour}). Using the first one in the label file: {classes[class_idx]['label_map'][class_label]['colour']}.")
-                            
-        #                     # Double check that the accession isn't already in the class label (if it is, something is wrong)
-        #                     if accession in classes[class_idx]["label_map"][class_label]['accessions']:
-        #                         LOG.error(f"Accession {accession} is already in class label {class_label}. This should not be possible.\nTruncated class label dict so far: {str(classes)[:50]}...\nTruncated offending entry: {str(classes[class_idx]['label_map'][class_label]['accessions'])[:100]}...")
-        #                         return None
-                            
-        #                     classes[class_idx]["label_map"][class_label]['accessions'].append(accession)
-
-        #         else:
-        #             # Parse lines in old format
-        #             accession, label, e_value = line.split()
-                    
-        #             if accessions.get(accession, None) is not None:
-        #                 LOG.warning(f"Duplicate accession found in label file: {accession}. The one with the lower E-value will be used.")
-        #                 if Decimal(e_value) < Decimal(accessions[accession][1]):
-        #                     accessions[accession] = [label, e_value]
-        #                 else:
-        #                     continue
-        #             else:
-        #                 accessions[accession] = [label, e_value]
-
-        #     if is_new:
-        #         return {"is_new": is_new, "labels": accessions, "class_labels": classes}
-        #     else:
-        #         return {"is_new": is_new, "labels": accessions, "class_labels": None}
     
 
     except FileNotFoundError:
@@ -287,6 +200,34 @@ def clinker(
             LOG.info("Starting cluster alignments")
             globaligner = align.align_clusters(*clusters, cutoff=identity, jobs=jobs)
             globaligner.build_gene_groups(functions=gene_functions)
+
+    if gnat_label and globaligner:
+        label_obj = label_obj_container[0]
+
+        if label_obj.is_new:
+            # Build additional groups
+            for i, c in enumerate(label_obj.classes):
+                fn = {}
+                colour_map = {}
+
+                name = c["label_name"]
+                label_map = c["label_map"]
+
+                for label in label_map:
+                    fn[label] = label_map[label]["accessions"]
+                    if label in colour_map:
+                        colour_map[label].append(label_map[label]["colour"])
+                    else:
+                        colour_map[label] = [label_map[label]["colour"]]
+
+                for label in colour_map:
+                    if len(colour_map[label]) > 1:
+                        LOG.warning(f"Label {label} has more than one colour assigned: {colour_map[label]}. Using first one.")
+                    colour_map[label] = colour_map[label][0]
+
+                new_group = globaligner.build_gene_groups_return(functions=fn, colour_map=colour_map, use_links=True, level=i+1)
+
+                globaligner.classes.append({"name": name, "groups": new_group})
 
     if globaligner.alignments:
         LOG.info("Generating results summary...")
@@ -462,14 +403,6 @@ def main():
     else:
         gnat_labelling = True
         label_obj_container[0] = label_obj
-
-    # Label Dict structure:
-    # { "is_new": bool, 
-    #   "labels": {accession: [label, e-value, [split_line[3:] (if is_new)]]}, 
-    #   "class_labels": [{"label_name": str, 
-    #                     "label_map": {str label: {"accessions": [accession, ...], 
-    #                                               "colour": str}}}, 
-    #                    ...] or None if not is_new }
 
     clinker(
         args.files,

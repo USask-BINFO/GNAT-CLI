@@ -245,7 +245,8 @@ class Globaligner(Serializer):
         self._cluster_names = defaultdict(dict)
 
         self.alignments = {}
-        self.groups = []
+        self.groups = [] # Set of groups used for the legend and colouring
+        self.classes = [] # List to store groups of genes (self.groups) to allow toggling of visibility (each item is a dict {"name": str, "groups": list(dict)})
         self.clusters = OrderedDict()
 
         if aligner_config is None:
@@ -286,6 +287,7 @@ class Globaligner(Serializer):
                 for uid, gene in self._genes.items()
             },
             "groups": [group.to_dict() for group in self.groups],
+            "classes": [{"name": c["name"], "groups": [group.to_dict() for group in c["groups"]]} for c in self.classes], 
             "alignments": {
                 uid: alignment.to_dict(uids_only=True)
                 for uid, alignment in self.alignments.items()
@@ -343,6 +345,10 @@ class Globaligner(Serializer):
             gr = Group.from_dict(group)
             ga.groups.append(gr)
 
+        for c in d["classes"]:
+            ga.classes.append({"name": c["name"], "groups": [Group.from_dict(group) for group in c["groups"]]})
+            # ga.classes.append([Group.from_dict(group) for group in c])
+
         return ga
 
     def __str__(self):
@@ -379,7 +385,8 @@ class Globaligner(Serializer):
                 for alignment in self.alignments.values()
                 for link in alignment.links
             ],
-            "groups": [group.to_dict() for group in self.groups]
+            "groups": [group.to_dict() for group in self.groups],
+            "classes": [{"name": c["name"], "groups": [group.to_dict() for group in c["groups"]]} for c in self.classes],
         }
 
     @property
@@ -528,6 +535,64 @@ class Globaligner(Serializer):
                 self.groups.append(group)
         for group in self.groups:
             group.genes = list(group.genes)
+
+    def build_gene_groups_return(self, functions: Optional[Dict[str, List[str]]]=None, colour_map=defaultdict(None), use_links=False, level=0, hidden=True) -> List[Dict]:
+        """Builds gene groups based on functions and stored gene-gene links (optional).
+        
+        `functions` maps genes to user-assigned functions; keys should correspond
+        to the `label` property of Gene objects. If specified, groups will first
+        be built from these functional groups and extended using gene-gene links.
+        If not, all groups will be built purely from gene-gene links.
+
+        `colour_map` contains the label: hex colour mappings
+
+        `use_links` specifies whether to use gene-gene links to extend groups. If False,
+        only the functional groups will be used.
+
+        `level` specifies the level of the group (e.g., 0 for default PID groups, 
+        1 for class 1 in new label file, 2 for class 2, and so on).
+
+        `hidden` specifies whether the new groups should be hidden by default. Default True.
+
+        e.g., If genes A and B are both assigned as category Z, and have links to
+            genes C and D, respectively, the result will be a single group Z,
+            containing genes A, B, C and D. Group Z is first made with genes A and B,
+            then extended to include C (because of link to A) and D (link to B).
+            Assuming use_links is True, if not, the group will only contain genes A and B.
+
+        Returns:
+            List of dictionaries containing group information.
+        """
+        groups = []
+        if functions:
+            for function, genes in functions.items():
+                uids = self.get_gene_uids(genes)
+                group = Group(label=function, genes=set(uids), level=level, hidden=hidden, colour=colour_map[function])
+                groups.append(group)
+        if use_links:
+            if not self._links:
+                for group in groups:
+                    group.genes = list(group.genes)
+                return groups
+            ds = DisjointSet()
+            for link in self._links.values():
+                ds.union(link.query.uid, link.target.uid)
+            for genes in ds.itersets():
+                merged = False
+                for group in groups:
+                    if not genes.isdisjoint(group.genes):
+                        group.genes.update(genes)
+                        merged = True
+                        break
+                if not merged:
+                    group = Group(label=f"Group {len(groups)}", genes=set(genes), level=level, hidden=hidden)
+                    groups.append(group)
+            for group in groups:
+                group.genes = list(group.genes)
+        else:
+            for group in groups:
+                group.genes = list(group.genes)
+        return groups
 
     def configure_aligner(self, **kwargs):
         """Change properties on the BioPython.PairwiseAligner object.
@@ -776,12 +841,13 @@ class Link(Serializer):
 class Group(Serializer):
     """A gene homology group."""
 
-    def __init__(self, uid=None, label=None, genes=None, hidden=False, colour=None):
+    def __init__(self, uid=None, label=None, genes=None, hidden=False, colour=None, level=None):
         self.uid = uid if uid else str(uuid.uuid4())
         self.label = label if label else f"Group {self.uid}"
         self.genes = genes if genes else []
         self.hidden = hidden
         self.colour = colour
+        self.level = level # Level of the group (e.g., 0 for default PID groups, 1 for class 1 in new label file, 2 for class 2, and so on)
 
     def to_dict(self):
         return {
@@ -790,6 +856,7 @@ class Group(Serializer):
             "genes": self.genes,
             "hidden": self.hidden,
             "colour": self.colour,
+            "level": self.level,
         }
 
     @classmethod
@@ -800,5 +867,6 @@ class Group(Serializer):
             genes=d.get("genes"),
             hidden=d.get("hidden"),
             colour=d.get("colour"),
+            level=d.get("level"),
         )
 

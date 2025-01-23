@@ -294,6 +294,19 @@ function plot(data) {
     plot.call(chart)
   }
 
+  let classNames = new Set();
+  if (data.classes != null) {
+    if (data.classes.length > 0) {
+      for (let c of data.classes) {
+        classNames.add(c.name);
+      }
+    }
+  }
+
+  for (let name of classNames) {
+    d3.select('#select-label-class').append("option").text(name);
+  }
+
   // Populate label type multi select and bind change handler
   let labelTypes = new Set()
   labelTypes.add("psi_blast_match") // Add psi_blast_match here so that it's always on top of the dropdown list
