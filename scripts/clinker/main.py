@@ -178,7 +178,10 @@ def clinker(
             LOG.info("Adding clusters to loaded session and aligning")
             globaligner.add_clusters(*clusters)
             globaligner.align_stored_clusters(cutoff=identity, jobs=jobs)
-            globaligner.build_gene_groups(functions=gene_functions)
+            groups = globaligner.build_gene_groups_return(functions=gene_functions, use_links=True, hidden=False)
+            globaligner.classes.append({"name": "Default", "groups": groups})
+            globaligner.groups = globaligner.classes[0]["groups"]
+            # globaligner.build_gene_groups(functions=gene_functions)
             load_session = False
     else:
         # Parse files, generate objects
@@ -193,16 +196,26 @@ def clinker(
         if no_align:
             globaligner = align.Globaligner()
             globaligner.add_clusters(*clusters)
-            globaligner.build_gene_groups(functions=gene_functions)
+            groups = globaligner.build_gene_groups_return(functions=gene_functions, use_links=True, hidden=False)
+            globaligner.classes.append({"name": "Default", "groups": groups})
+            globaligner.groups = globaligner.classes[0]["groups"]
+            # globaligner.build_gene_groups(functions=gene_functions)
         elif len(clusters) == 1:
             globaligner = align.align_clusters(clusters[0], jobs=1)
         else:
             LOG.info("Starting cluster alignments")
             globaligner = align.align_clusters(*clusters, cutoff=identity, jobs=jobs)
-            globaligner.build_gene_groups(functions=gene_functions)
+            groups = globaligner.build_gene_groups_return(functions=gene_functions, use_links=True, hidden=False)
+            globaligner.classes.append({"name": "Default", "groups": groups})
+            globaligner.groups = globaligner.classes[0]["groups"]
+            # globaligner.build_gene_groups(functions=gene_functions)
 
     if gnat_label and globaligner:
         label_obj = label_obj_container[0]
+
+        # Add default groups to globalaligner.classes
+        if "Default" not in [c["name"] for c in globaligner.classes]:
+            globaligner.classes.append({"name": "Default", "groups": globaligner.groups})
 
         if label_obj.is_new:
             # Build additional groups
@@ -214,6 +227,8 @@ def clinker(
                 label_map = c["label_map"]
 
                 for label in label_map:
+                    if label == "" or label == "None":
+                        continue
                     fn[label] = label_map[label]["accessions"]
                     if label in colour_map:
                         colour_map[label].append(label_map[label]["colour"])
@@ -225,9 +240,11 @@ def clinker(
                         LOG.warning(f"Label {label} has more than one colour assigned: {colour_map[label]}. Using first one.")
                     colour_map[label] = colour_map[label][0]
 
-                new_group = globaligner.build_gene_groups_return(functions=fn, colour_map=colour_map, use_links=True, level=i+1)
+                new_group = globaligner.build_gene_groups_return(functions=fn, colour_map=colour_map, use_links=False, level=i+1)
 
                 globaligner.classes.append({"name": name, "groups": new_group})
+
+
 
     if globaligner.alignments:
         LOG.info("Generating results summary...")
@@ -254,7 +271,6 @@ def clinker(
             matrix = globaligner.format_matrix(normalise=True, as_distance=True)
             with open(matrix_out, "w") as fp:
                 fp.write(matrix)
-
     else:
         LOG.info("No alignments were generated")
 

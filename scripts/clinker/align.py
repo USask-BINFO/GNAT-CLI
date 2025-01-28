@@ -376,12 +376,32 @@ class Globaligner(Serializer):
         Assign unique indices to all clusters, loci, genes
         """
         clusters = [cluster.to_dict() for cluster in self.clusters.values()]
+        # # print([link.to_dict(uids_only=True)
+        # #         for alignment in self.alignments.values()
+        # #         for link in alignment.links][-1])
+        # links = []
+        # i =0 
+        # for alignment in self.alignments.values():
+        #     for link in alignment.links:
+        #         if i == 0:
+        #             print(link.to_dict(uids_only=True))
+        #             i = -1
+        #         l = link.to_dict()
+        #         no_seq_link = link.to_dict()
+        #         for gene in ["query", "target"]:
+        #             no_seq_link[gene] = {}
+        #             for key in l[gene]:
+        #                 if key == "uid": #not in ["translation", "sequence", "names", "label", "strand", "start", "end"]:
+        #                     no_seq_link[gene][key] = l[gene][key]
+        #         links.append(no_seq_link)
+        # print(links[0])
         return {
             "clusters": clusters if use_file_order else [
                 clusters[i] for i in self.order(i=i, method=method)
             ],
+            # "links": links,
             "links": [
-                link.to_dict()
+                link.to_dict(uids_only=True)
                 for alignment in self.alignments.values()
                 for link in alignment.links
             ],
@@ -825,8 +845,8 @@ class Link(Serializer):
     def to_dict(self, uids_only=False):
         return {
             "uid": self.uid,
-            "query": self.query.uid if uids_only else self.query.to_dict(),
-            "target": self.target.uid if uids_only else self.target.to_dict(),
+            "query": {"uid": self.query.uid} if uids_only else self.query.to_dict(),
+            "target": {"uid": self.target.uid} if uids_only else self.target.to_dict(),
             "identity": self.identity,
             "similarity": self.similarity,
         }

@@ -294,6 +294,7 @@ function plot(data) {
     plot.call(chart)
   }
 
+  // Populate new class label opts
   let classNames = new Set();
   if (data.classes != null) {
     if (data.classes.length > 0) {
@@ -304,8 +305,56 @@ function plot(data) {
   }
 
   for (let name of classNames) {
-    d3.select('#select-label-class').append("option").text(name);
+    if (name !== "Default") {
+      d3.select('#select-label-class').append("option").text(name);
+    }
   }
+
+  // Add event listener to change class labels
+  d3.select("#select-label-class").on("change", function() {
+    let e = document.getElementById("select-label-class");
+    let type = e.options[e.selectedIndex].value;
+
+    // Check data for the class label
+    let groupIdx = -1;
+    for (let i = 0; i < data.classes.length; i++) {
+      if (data.classes[i].name == type) {
+        groupIdx = i;
+        break;
+      }
+    }
+
+    if (groupIdx == -1) {
+      alert("Error: Class label not found in data. Please ensure the class label is present in the data.");
+      return;
+    } else {
+      for (let i = 0; i < data.groups.length; i++) {
+        data.groups[i].hidden = true;
+      }
+
+      console.log(data.groups)
+      console.log(data.classes)
+
+      data.groups = [];
+
+      for (let i = 0; i < data.classes[groupIdx].groups.length; i++) {
+        data.classes[groupIdx].groups[i].hidden = false;
+        data.groups.push(data.classes[groupIdx].groups[i]);
+      }
+    }
+
+    if (type != "Default") {
+      data.oldLinks = data.links;
+      data.links = [];
+    } else {
+      data.links = data.oldLinks;
+      data.oldLinks = [];
+    }
+    // d3.selectAll("text.geneLabel").each(d => d.label = d.names[type] ? d.names[type] : " ");
+
+    // d3.selectAll("text.geneLabel").each(d => d.label = d.names[type] ? d.names[type] : "skskskssk")
+    plot.call(chart);
+  });
 
   // Populate label type multi select and bind change handler
   let labelTypes = new Set()
@@ -618,6 +667,7 @@ function plot(data) {
   // MODIFY GROUP LABELS ------------------------------------------------------------------------------------------------
   d3.select("#input-group-label-show")
   .on("change", function() {
+    // Need to check if group.groupNum exists!
     if (d3.select(this).property("checked")) {
       for (let group of data.groups) {
         if (group.label.includes("Group "+group.groupNum)) {}
@@ -639,6 +689,7 @@ function plot(data) {
   });
   d3.select("#input-group-label-length")
     .on("change", function() {
+      // Need to check if group.products exists!
       newLen = this.value
       for (let group of data.groups) {
         let newArr = []
