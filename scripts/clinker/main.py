@@ -65,7 +65,7 @@ def parse_gnat_label_file(label_file_location=None):
         return None
     except Exception as e:
         LOG.error(f"Unexpected error parsing label file: {e.__class__.__name__}: {e}")
-        return None
+        raise e
 
 def parse_range(string):
     """Extracts the scaffold name, start and end of a scaffold range string.
@@ -230,10 +230,17 @@ def clinker(
                     if label == "" or label == "None":
                         continue
                     fn[label] = label_map[label]["accessions"]
-                    if label in colour_map:
-                        colour_map[label].append(label_map[label]["colour"])
+                    colour = label_map[label]["colour"]
+                    if colour.strip() not in [None, "", "None"]:
+                        if label in colour_map:
+                            colour_map[label].append(colour)
+                        else:
+                            colour_map[label] = [colour]
                     else:
-                        colour_map[label] = [label_map[label]["colour"]]
+                        if label in colour_map:
+                            colour_map[label].append("")
+                        else:
+                            colour_map[label] = [""]
 
                 for label in colour_map:
                     if len(colour_map[label]) > 1:

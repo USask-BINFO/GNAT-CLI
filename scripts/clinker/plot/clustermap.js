@@ -44,7 +44,7 @@
     var defaultConfig = {
       plot: {
         transitionDuration: 250,
-        scaleFactor: 15,
+        scaleFactor: 50,
         scaleGenes: true,
         fontFamily:
           'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", Oxygen, Cantarell, sans-serif',
@@ -74,7 +74,7 @@
         marginTop: 20,
       },
       link: {
-        show: true,
+        show: false,
         asLine: false,
         straight: false,
         threshold: 0,
@@ -114,7 +114,7 @@
         label: {
           anchor: "start",
           fontSize: 10,
-          rotation: 25,
+          rotation: 45,
           position: "top",
           spacing: 2,
           show: false,

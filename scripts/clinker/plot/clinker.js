@@ -350,9 +350,6 @@ function plot(data) {
       data.links = data.oldLinks;
       data.oldLinks = [];
     }
-    // d3.selectAll("text.geneLabel").each(d => d.label = d.names[type] ? d.names[type] : " ");
-
-    // d3.selectAll("text.geneLabel").each(d => d.label = d.names[type] ? d.names[type] : "skskskssk")
     plot.call(chart);
   });
 
@@ -738,36 +735,39 @@ function plot(data) {
 
   //---------------------------------------------------------------------------------------------------------------------
   // Block of custom code to change the default plot values, flip backwards loci, and set the anchor gene
-  function set_defaults() {
-  update({gene: {label: {show: true}}}); // Gene labels on by default
-  d3.selectAll("text.geneLabel").each(d => d.label = d.names["psi_blast_match"] ? d.names["psi_blast_match"] : d.names["clear"]); update({}); // Default label psi_blast_match if present, else clear (" ")
-  update({link: {show: false}}) // Default show links off
-  update({plot: {scaleFactor: 50}}) // Default scale 50
-  update({gene: {label: {rotation: 45}}}) // Default gene label angle = 45 degrees
-  }
-  set_defaults()
+
+  
+  // Changing the clustermap default config for showing gene labels doesn't work, so have to set it here
+  d3.selectAll("text.geneLabel").each(d => d.label = d.names["psi_blast_match"] ? d.names["psi_blast_match"] : d.names["clear"]); // Default label dynamic_match if present, else clear (" ")
+  d3.select("#plot").call(ClusterMap.ClusterMap()
+    .config({
+      gene: {
+        label: {
+          show: true,
+        }
+      },
+    }))
 
     // Simulate mouse events to flip loci and set the anchor gene
-  const event = new MouseEvent('dblclick', {
+  const dblClickEvent = new MouseEvent('dblclick', {
     'view': window,
     'bubbles': true,
     'cancelable': true
   });
 
-  const event2 = new MouseEvent('click', {
+  const clickEvent = new MouseEvent('click', {
     'view': window,
     'bubbles': true,
     'cancelable': true
   });
 
   for (let locus_id of flipLoci) {
-    document.getElementById(locus_id).dispatchEvent(event)
+    document.getElementById(locus_id).dispatchEvent(dblClickEvent)
   }
 
   for (anchorGeneUid of anchorGenes) {
-    document.getElementById(anchorGeneUid).getElementsByTagName("polygon")[0].dispatchEvent(event2);
+    document.getElementById(anchorGeneUid).getElementsByTagName("polygon")[0].dispatchEvent(clickEvent);
   }
-  //document.getElementById(anchorGeneId).getElementsByTagName("polygon")[0].dispatchEvent(event2);
 
   // End of custom block
   //---------------------------------------------------------------------------------------------------------------------
@@ -782,23 +782,6 @@ if (typeof data === 'undefined') {
 
 //-----------------------------------------------------------------------------------------------------------------------
 // More Custom
-
-function updatePlot() {
-  // Not used, just in case I need to change something in data and update the plot to reflect the change
-  d3.select("#plot").call(ClusterMap.ClusterMap()
-  .config({
-    scaleFactor: 50,  // Modified, used to be 30
-    cluster: {
-      spacing: 50,
-      alignLabels: true,
-    },
-    gene: {
-      label: {
-        show: false,
-      }
-    },
-  }))
-}
 
 // Modify title element (name on tab) to display which file is open
 let filename = window.location.pathname.split("/").pop().split(".")[0];
