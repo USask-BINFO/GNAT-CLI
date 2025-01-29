@@ -87,6 +87,11 @@ class LabelObject:
         # print(f"Adding line: {split_line}")
 
         if self.is_new:
+            # Make sure the line is the correct length
+            if len(split_line[3:]) != 2 * self.num_classes:
+                    # Pad with blanks
+                    split_line += ["" for _ in range(2 * self.num_classes - len(split_line[3:]))]
+           
             # Add line in new format
             if accession in self.accessions:
                 if len(split_line[3:]) != 2 * self.num_classes:
@@ -122,13 +127,20 @@ class LabelObject:
                 class_label = split_line[j]
                 class_colour = split_line[j+1]
 
+                if not is_hex_colour(class_colour):
+                    print(f"Warning: Colour '{class_colour}' is not a valid hex colour string. Please provide a valid hex colour string.")
+                    class_colour = ""
+
                 if class_label not in self.classes[class_idx]["label_map"]:
                     self.classes[class_idx]["label_map"][class_label] = {"accessions": [accession], "colour": class_colour}
 
                 else:
                     # Class label already exists, add accession to it (and make sure the colour is the same)
                     if class_colour != self.classes[class_idx]["label_map"][class_label]["colour"]:
-                        print(f"Warning: Class label '{class_label}' has multiple colours in label file (new colour: '{class_colour}'). Using the first one in the label file: {self.classes[class_idx]['label_map'][class_label]['colour']}.")
+                        # print(f"Warning: Class label '{class_label}' has multiple colours in label file (new colour: '{class_colour}'). Using the first non-blank one in the label file.")
+                        if self.classes[class_idx]["label_map"][class_label]["colour"] == "" and class_colour != "" and is_hex_colour(class_colour):
+                            self.classes[class_idx]["label_map"][class_label]["colour"] = class_colour
+                            print(f"Warning: Class label '{class_label}' has been assigned colour '{class_colour}'.")
 
                     # Double check that the accession isn't already in the class label (if it is, something is wrong)
                     if accession in self.classes[class_idx]["label_map"][class_label]["accessions"]:
@@ -215,6 +227,11 @@ class LabelObject:
         if class_level >= len(self.classes):
             raise ValueError(f"Class level index {class_level} is out of range. There are only {len(self.classes)} class levels.")
 
+        if not is_hex_colour(class_colour):
+            print(f"Warning: Colour '{class_colour}' is not a valid hex colour string. Please provide a valid hex colour string.")
+            class_colour = ""
+        
+
         if self.is_new:
             # New format
             for accession in self.accessions:
@@ -255,10 +272,13 @@ class LabelObject:
             for class_idx in range(len(self.classes)):
                 for class_label in self.classes[class_idx]["label_map"]:
                     if self.classes[class_idx]["label_map"][class_label]["colour"] is None:
-                        print(f"Warning: Class label '{class_label}' has no colour assigned. Assigning a random colour.")
-                        self.classes[class_idx]["label_map"][class_label]["colour"] = "#000000"
+                        print(f"Warning: Class label '{class_label}' has no colour assigned.")
+                        self.classes[class_idx]["label_map"][class_label]["colour"] = ""
                     else:
                         colour = self.classes[class_idx]["label_map"][class_label]["colour"]
+                        if not is_hex_colour(colour):
+                            print(f"Warning: Colour '{colour}' is not a valid hex colour string. Please provide a valid hex colour string.")
+                            self.classes[class_idx]["label_map"][class_label]["colour"] = ""
                         if colour in existing_colour_map:
                             if class_label not in existing_colour_map[colour]:
                                 print(f"Warning: Colour '{colour}' is assigned to multiple class labels: '{existing_colour_map[colour]}' and '{class_label}'.")
@@ -470,13 +490,35 @@ class LabelObject:
                 old_list = self.accessions[accession]
                 self.accessions[accession] = (old_list[0], old_list[1])
 
+def is_hex_colour(hex_str):
+    """
+    Checks if hex_str is a valid hex colour string.
+    """
+    if hex_str is None:
+        return False
+    if hex_str == "":
+        return True # This is what I reset the invalids to 
+    if hex_str[0] != "#":
+        return False
+    if len(hex_str) != 7:
+        return False
+    for c in hex_str[1:]:
+        if c.upper() not in "0123456789ABCDEF":
+            return False
+    return True
+
 
 
 if __name__ == "__main__":
+    # Get parent directory of this script
+    import os
+    import sys
+    parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    lf_dir = os.path.join(parent_dir, "scripts", "lf_testing")
     # Testing
     print("Reading LF 1")
     label_obj_1 = LabelObject()
-    label_obj_1.from_file("/home/njt694/gnat/utils/AcrVis/scripts/lf_testing/l1_new.label")
+    label_obj_1.from_file(os.path.join(lf_dir, "l1_new.label"))
     print(label_obj_1)
     print(label_obj_1.classes)
     print(label_obj_1.accessions)
@@ -485,7 +527,7 @@ if __name__ == "__main__":
     print("Reading LF 2")
 
     label_obj_2 = LabelObject()
-    label_obj_2.from_file("/home/njt694/gnat/utils/AcrVis/scripts/lf_testing/l2_new.label")
+    label_obj_2.from_file(os.path.join(lf_dir, "l2_new.label"))
     print(label_obj_2)
     print(label_obj_2.classes)
     print(label_obj_2.accessions)
@@ -493,7 +535,7 @@ if __name__ == "__main__":
     print("\n\n")
     print("Merging LF 2 into LF 1")
 
-    label_obj_1.merge_label_file("/home/njt694/gnat/utils/AcrVis/scripts/lf_testing/l2_new.label")
+    label_obj_1.merge_label_file(os.path.join(lf_dir, "l2_new.label"))
     print(label_obj_1)
     print(label_obj_1.classes)
     print(label_obj_1.accessions)
@@ -510,7 +552,7 @@ if __name__ == "__main__":
     print("Reading LF 3 (old fmt)")
 
     label_obj_3 = LabelObject()
-    label_obj_3.from_file("/home/njt694/gnat/utils/AcrVis/scripts/lf_testing/l3_old.label")
+    label_obj_3.from_file(os.path.join(lf_dir, "l3_old.label"))
     print(label_obj_3)
     print(label_obj_3.classes)
     print(label_obj_3.accessions)
@@ -539,4 +581,11 @@ if __name__ == "__main__":
     print(label_obj_3)
     print(label_obj_3.classes)
     print(label_obj_3.accessions)
-    pass
+
+    print("\n\n")
+    print("Reading new LF 4 (lf with no padding)")
+
+    label_obj_4 = LabelObject()
+    label_obj_4.from_file(os.path.join(lf_dir, "l4_new.label"))
+
+    print(label_obj_4)
