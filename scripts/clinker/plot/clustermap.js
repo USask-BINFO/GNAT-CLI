@@ -392,7 +392,18 @@
       labelText: (g) => g.label || g.uid,
       polygonClass: (g) => {
         let group = scales.group(g.uid);
-        return group !== null ? `genePolygon group-${group}` : "genePolygon";
+        let existingClasses = g.classList ? g.classList.value : "genePolygon";
+
+        if (group !== null) {
+          let newClass = `group-${group}`;
+
+          // only append if not already present
+          if (!existingClasses.includes(newClass)) {
+            return `${existingClasses} ${newClass}`;
+          }
+        }
+        return existingClasses;
+        // return group !== null ? `genePolygon group-${group}` : "genePolygon";
       },
       update: (selection) => {
         selection

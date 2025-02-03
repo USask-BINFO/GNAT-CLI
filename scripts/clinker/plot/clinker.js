@@ -328,12 +328,15 @@ function plot(data) {
       alert("Error: Class label not found in data. Please ensure the class label is present in the data.");
       return;
     } else {
+
+      resetBolding(); // Reset bolding of groups if they were toggled on
+
       for (let i = 0; i < data.groups.length; i++) {
         data.groups[i].hidden = true;
       }
 
-      console.log(data.groups)
-      console.log(data.classes)
+      // console.log(data.groups)
+      // console.log(data.classes)
 
       data.groups = [];
 
@@ -344,13 +347,18 @@ function plot(data) {
     }
 
     if (type != "Default") {
-      data.oldLinks = data.links;
-      data.links = [];
+      // Make sure links isn't already empty
+      if (data.links.length > 0) {
+        data.oldLinks = data.links;
+        data.links = [];
+      }
     } else {
       data.links = data.oldLinks;
       data.oldLinks = [];
     }
+
     plot.call(chart);
+    boldGroupSetUp();
   });
 
   // Populate label type multi select and bind change handler
@@ -824,9 +832,6 @@ for (target of targets) {
     });
 }
 
-// Add event listeners to thicken borders of genes that are members of hovered group
-const groupTargets = document.getElementsByClassName("legend")[0].getElementsByClassName("element");
-
 function boldGroup(g) {
   // Function to bold-ify the borders of genes within a group
   g.style.fontWeight = 'bold';
@@ -854,33 +859,53 @@ function checkBold(g) {
   return g.style.fontWeight == 'bold';
 }
 
-for (g of groupTargets) {
-  g.boldToggled = false; // Set a flag to check if the group was bolded via dblclick
+function boldGroupSetUp() {
+  // Add event listeners to thicken borders of genes that are members of hovered group
+  let groupTargets = document.getElementsByClassName("legend")[0].getElementsByClassName("element");
 
-  g.addEventListener("mouseenter", function() {
-    if (!checkBold(this) && !this.boldToggled) {
-      boldGroup(this);
-    }
-  })
+  for (g of groupTargets) {
+    g.boldToggled = false; // Set a flag to check if the group was bolded via dblclick
 
-  g.addEventListener("mouseleave", function() {
-    if (checkBold(this) && !this.boldToggled) {
-      unboldGroup(this);
-    }
-  })
-
-  g.addEventListener("click", function(e) {
-    if (e.shiftKey) {
-      if (this.boldToggled) {
-        this.boldToggled = false;
-        unboldGroup(this);
-      } else {
-        this.boldToggled = true;
+    g.addEventListener("mouseenter", function() {
+      if (!checkBold(this) && !this.boldToggled) {
         boldGroup(this);
       }
-    }
-  })
+    })
+
+    g.addEventListener("mouseleave", function() {
+      if (checkBold(this) && !this.boldToggled) {
+        unboldGroup(this);
+      }
+    })
+
+    g.addEventListener("click", function(e) {
+      if (e.shiftKey) {
+        if (this.boldToggled) {
+          this.boldToggled = false;
+          unboldGroup(this);
+        } else {
+          this.boldToggled = true;
+          boldGroup(this);
+        }
+      }
+    })
+  }
 }
+
+function resetBolding() {
+  // Reset bolding of all groups (called when group type is changed)
+  const groupTargets = document.getElementsByClassName("legend")[0].getElementsByClassName("element");
+
+  for (g of groupTargets) {
+    if (checkBold(g)) {
+      unboldGroup(g);
+    }
+  }
+}
+
+// Add group event listeners to groups on page load
+boldGroupSetUp();
+// document.addEventListener("DOMContentLoaded", boldGroupSetUp);
 
 
 // End
