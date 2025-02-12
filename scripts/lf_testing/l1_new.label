@@ -1,0 +1,4 @@
+#accession,label,evalue,cl1,cl1_colour,cl3,cl3_colour,cl5,cl5_colour
+A,L,0.0,label1,#ff0000,label3,#ff0000,,
+C,L,0.1,label2,#00ff00,label5,#00ffff,,
+B,P,12,label3,#0000ff,,,label11,#00ffa5
