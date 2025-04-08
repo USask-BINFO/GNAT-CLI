@@ -7,14 +7,103 @@ Class to faciliate label file manipulation.
 from decimal import Decimal
 import colorsys
 import random
+from sortedcontainers import SortedList
 
 class LabelObject:
     def __init__(self):
-        self.accessions = {}
+        self.accessions = SortedList(key=lambda x: x[0])
         self.is_new = False
         self.num_classes = 0
         self.classes = None
         self.header = None
+
+    def __len__(self):
+        """
+        Return the number of accessions in the label object.
+        """
+        return len(self.accessions)
+
+    def _in_(self, accession):
+        """
+        Check if an accession is in the SortedList. (self.accessions)
+        If accession is not in the list, return False.
+        If accession is in the list, return True.
+        """
+        result = self.accessions.bisect_left([accession])
+        return result != len(self.accessions)
+
+    def __contains__(self, accession):
+        """
+        Check if an accession is in the SortedList. (self.accessions)
+        If accession is not in the list, return False.
+        If accession is in the list, return True.
+        """
+        result = self.accessions.bisect_left([accession])
+        return result != len(self.accessions) and self.accessions[result][0] == accession # Had to add second check since bisect_left can return 0 if the accession is smaller than all the accessions in the list
+        # Could also do bisect_left and bisect_right, because when they're equal it means the accession isn't in the list (from what I've tested anyway), but that's 2*O(log N) instead of 1*O(log N)
+    
+    def __getitem__(self, accession):
+        """
+        Get the label line for a given accession.
+        :param accession: The accession to get the label line for.
+        :return: The label line for the given accession.
+        """
+        result = self.accessions.bisect_left([accession])
+        if result != len(self.accessions):
+            return self.accessions[result]
+        else:
+            raise KeyError(f"Accession {accession} not found in label object.")
+        
+    def __setitem__(self, accession, new_line):
+        """
+        Set a new line in self.accessions for a given accession.
+        :param new_line: The new line (as a list) to set for the given accession. IT SHOULD START WITH THE ACCESSION.
+        """
+        index = self.accessions.bisect_left([accession])
+
+        if index != len(self.accessions) and self.accessions[index][0] == accession:
+            # Accession already exists, update it
+            del self.accessions[index]
+
+            self.accessions.add(new_line)
+
+        else:
+            # Accession doesn't exist, add it
+            self.accessions.add(new_line)
+
+    def __str__(self, fmt="new"):
+        """
+        Convert the label object to a string of label file lines.
+        """
+        fmt = fmt == "new"
+        if fmt != self.is_new:
+            self.switch_format()
+            
+        if self.is_new:
+            # New format
+            label_str = f"{self.header}\n"
+            for line in self.accessions:
+                accession, label, e_value = line[:3]
+                label_str += f"{accession},{label},{e_value}"
+                for class_idx in range(len(self.classes)):
+                    add_flag = False
+                    for class_label in self.classes[class_idx]["label_map"]:
+                        if accession in self.classes[class_idx]["label_map"][class_label]["accessions"]:
+                            label_str += f",{class_label},{self.classes[class_idx]['label_map'][class_label]['colour']}"
+                            add_flag = True
+                            break
+                    if not add_flag:
+                        label_str += ",,"
+                label_str += "\n"
+        else:
+            # Old format
+            label_str = ""
+            for line in self.accessions:
+                accession, label, e_value = line[:3]
+                label_str += f"{accession}\t{label}\t{e_value}\n"
+
+        return label_str
+
 
     def from_file(self, label_file):
         """
@@ -93,23 +182,24 @@ class LabelObject:
                     split_line += ["" for _ in range(2 * self.num_classes - len(split_line[3:]))]
            
             # Add line in new format
-            if accession in self.accessions:
+            if self.__contains__(accession):
                 if len(split_line[3:]) != 2 * self.num_classes:
                     # Pad with blanks
                     split_line += ["" for _ in range(2 * self.num_classes - len(split_line[3:]))]
 
                 # Accession already exists, update label and e_value with the lower of the two e_values
-                if Decimal(e_value) < Decimal(self.accessions[accession][1]):
+                if Decimal(e_value) < Decimal(self.__getitem__(accession)[2]):
                     replace_dupe = True
-                    old_classes = self.accessions[accession][2]
-                    self.accessions[accession] = [label, e_value, split_line[3:]]
+                    old_classes = self.__getitem__(accession)[3]
+                    self.__setitem__(accession, [accession, label, e_value, split_line[3:]])
 
                 else:
                     # New dupilcate has a larger e_value so we can just return
                     return
             else:
                 # New accession
-                self.accessions[accession] = [label, e_value, split_line[3:]]
+                self.__setitem__(accession, [accession, label, e_value, split_line[3:]])
+                # self.accessions[accession] = [label, e_value, split_line[3:]]
 
             if replace_dupe:
                 # TODO: SHOULD I DO THIS? SHOULD I DELETE THE OLD CLASS LABELS??? THERE ISN'T A NEW CLASS LABEL... nevermind looks like I do add it later
@@ -150,14 +240,16 @@ class LabelObject:
         
         else:
             # Add line in old format
-            if accession in self.accessions:
+            if self.__contains__(accession):
                 # Accession already exists, update label and e_value with the lower of the two e_values
-                if Decimal(e_value) < Decimal(self.accessions[accession][1]):
-                    self.accessions[accession] = (label, e_value)
+                if Decimal(e_value) < Decimal(self.__getitem__(accession)[2]):
+                    # self.accessions[accession] = (label, e_value)
+                    self.__setitem__(accession, [accession, label, e_value])
                 else:
                     return
             else:
-                self.accessions[accession] = (label, e_value)
+                # self.accessions[accession] = (label, e_value)
+                self.__setitem__(accession, [accession, label, e_value])
             
     def add_parsed_line(self, split_line):
         """
@@ -184,37 +276,6 @@ class LabelObject:
         
         for line in parsed_lines:
             self.add_parsed_line(line.split())
-
-    def __str__(self, fmt="new"):
-        """
-        Convert the label object to a string of label file lines.
-        """
-        fmt = fmt == "new"
-        if fmt != self.is_new:
-            self.switch_format()
-            
-        if self.is_new:
-            # New format
-            label_str = f"{self.header}\n"
-            for accession in self.accessions:
-                label_str += f"{accession},{self.accessions[accession][0]},{self.accessions[accession][1]}"
-                for class_idx in range(len(self.classes)):
-                    add_flag = False
-                    for class_label in self.classes[class_idx]["label_map"]:
-                        if accession in self.classes[class_idx]["label_map"][class_label]["accessions"]:
-                            label_str += f",{class_label},{self.classes[class_idx]['label_map'][class_label]['colour']}"
-                            add_flag = True
-                            break
-                    if not add_flag:
-                        label_str += ",,"
-                label_str += "\n"
-        else:
-            # Old format
-            label_str = ""
-            for accession in self.accessions:
-                label_str += f"{accession}\t{self.accessions[accession][0]}\t{self.accessions[accession][1]}\n"
-
-        return label_str
     
     def propagate_class_labels(self, text_label, class_level, class_label, class_colour):
         """
@@ -234,8 +295,10 @@ class LabelObject:
 
         if self.is_new:
             # New format
-            for accession in self.accessions:
-                if self.accessions[accession][0] == text_label:
+            for line in self.accessions:
+                accession, label, e_value = line[:3]
+                # if self.accessions[accession][0] == text_label:
+                if label == text_label:
                     if class_label not in self.classes[class_level]["label_map"]:
                         self.classes[class_level]["label_map"][class_label] = {"accessions": [accession], "colour": class_colour}
                     else:
@@ -255,8 +318,9 @@ class LabelObject:
             self.classes.append({"label_name": class_label, "label_map": {}})
             self.header += f",{class_label},{class_label}_colour"
 
-            for accession in self.accessions:
-                self.accessions[accession][2].append(",,")
+            for line in self.accessions:
+                line[3].append(",,")
+                # self.accessions[accession][2].append(",,")
 
         else:
             # Old format
@@ -341,34 +405,48 @@ class LabelObject:
     def rename_label(self, old_label, new_label):
         if self.is_new:
             # New format, need to change the label in the accessions and classes
-            for accession in self.accessions:
-                if self.accessions[accession][0] == old_label:
-                    self.accessions[accession][0] = new_label
+            for line in self.accessions:
+                accession, label = line[:2]
+                # if self.accessions[accession][0] == old_label:
+                #     self.accessions[accession][0] = new_label
+                if label == old_label:
+                    line[1] = new_label
 
             for class_idx in range(len(self.classes)):
                 if old_label in self.classes[class_idx]["label_map"]:
                     self.classes[class_idx]["label_map"][new_label] = self.classes[class_idx]["label_map"].pop(old_label)
         else:
             # Old format
-            for accession in self.accessions:
-                if self.accessions[accession][0] == old_label:
-                    self.accessions[accession][0] = new_label
+            # for accession in self.accessions:
+            #     if self.accessions[accession][0] == old_label:
+            #         self.accessions[accession][0] = new_label
+            for line in self.accessions:
+                accession, label = line[:2]
+                if label == old_label:
+                    line[1] = new_label
 
     def remove_label(self, label):
+        delete_indices = []
         if self.is_new:
             # New format, need to remove the label from the accessions and classes
-            for accession in self.accessions:
-                if self.accessions[accession][0] == label:
-                    del self.accessions[accession]
+            for i, line in enumerate(self.accessions):
+                line_label = line[1]
+                if line_label == label:
+                    delete_indices.append(i)
 
             for class_idx in range(len(self.classes)):
                 if label in self.classes[class_idx]["label_map"]:
                     del self.classes[class_idx]["label_map"][label]
         else:
             # Old format
-            for accession in self.accessions:
-                if self.accessions[accession][0] == label:
-                    del self.accessions[accession]
+            for i, line in enumerate(self.accessions):
+                line_label = line[1]
+                if line_label == label:
+                    delete_indices.append(i)
+
+        # Remove the accessions from the list
+        for i in reversed(delete_indices):
+            del self.accessions[i]
 
     def relabel_accession(self, accession, new_label, relabel_if_last=True):
         """
@@ -376,15 +454,21 @@ class LabelObject:
         """
         if self.is_new:
             # New format, need to change the label in the accessions
-            if accession in self.accessions:
-                old_label = self.accessions[accession][0]
-                self.accessions[accession][0] = new_label
+            # if accession in self.accessions:
+            #     old_label = self.accessions[accession][0]
+            #     self.accessions[accession][0] = new_label
+            if self.__contains__(accession):
+                line = self.__getitem__(accession)
+                old_label = line[1]
+                line[1] = new_label
 
             # Check if that was the last accession with the old label
             old_label_count = 0
-            for acc in self.accessions:
-                if self.accessions[acc][0] == old_label:
+            for line in self.accessions:
+                acc, label = line[:2]
+                if label == old_label:
                     old_label_count += 1
+                    break # No point counting all of them, just need to know if there are any left
 
             if old_label_count == 0 and relabel_if_last:
                 # No more accessions with the old label, relabel all class labels with the old label to the new label
@@ -397,8 +481,9 @@ class LabelObject:
 
         else:
             # Old format
-            if accession in self.accessions:
-                self.accessions[accession][0] = new_label
+            if self.__contains__(accession):
+                line = self.__getitem__(accession)
+                line[1] = new_label
 
     def merge_label_file(self, new_label_file):
         """
@@ -436,14 +521,15 @@ class LabelObject:
                 self.add_class_level(c)
 
             # Loop through the accessions to add them to the old label object
-            for accession in new_label_obj.accessions:
+            for line in new_label_obj.accessions:
+                accession, label, e_value = line[:3]
                 # Rebuild the line to add to the old label object
-                new_label_line = [accession, new_label_obj.accessions[accession][0], new_label_obj.accessions[accession][1]]
+                new_label_line = [accession, label, e_value]
 
                 # Pad the line with blanks for the new total number of classes
                 new_label_line += ["" for _ in range(2 * len(self.classes) - len(new_label_line[3:]))]
 
-                line_new_classes = new_label_obj.accessions[accession][2]
+                line_new_classes = line[3]
                 # Remap these new classes to the mapping
                 for i in range(0, len(line_new_classes), 2):
                     print(line_new_classes)
@@ -453,15 +539,20 @@ class LabelObject:
                     new_label_line[line_idx] = line_new_classes[i]
                     new_label_line[line_idx + 1] = self.colour_picker(1)[0]
 
-                self.add_line(new_label_line)
+                try:
+                    self.add_line(new_label_line)
+                except:
+                    print(f"Error adding line: {new_label_line}")
+                    raise
             
             # Re-assign colours to the class levels
             self.re_assign_colours()
 
         else:
             # Old format
-            for accession in new_label_obj.accessions:
-                self.add_line([accession, new_label_obj.accessions[accession][0], new_label_obj.accessions[accession][1]])
+            for line in new_label_obj.accessions:
+                accession, label, e_value = line[:3]
+                self.add_line([accession, label, e_value])
 
 
 
@@ -476,9 +567,12 @@ class LabelObject:
             self.num_classes = 0
             self.classes = []
             
-            for accession in self.accessions:
-                old_tuple = self.accessions[accession]
-                self.accessions[accession] = [old_tuple[0], old_tuple[1], []]
+            # for accession in self.accessions:
+            #     old_tuple = self.accessions[accession]
+            #     self.accessions[accession] = [old_tuple[0], old_tuple[1], []]
+            for line in self.accessions:
+                accession, label, e_value = line[:3]
+                self.__setitem__(accession, [accession, label, e_value, []])
 
         else:
             # Convert to old format
@@ -486,9 +580,12 @@ class LabelObject:
             self.num_classes = 0
             self.classes = None
 
-            for accession in self.accessions:
-                old_list = self.accessions[accession]
-                self.accessions[accession] = (old_list[0], old_list[1])
+            # for accession in self.accessions:
+            #     old_list = self.accessions[accession]
+            #     self.accessions[accession] = (old_list[0], old_list[1])
+            for line in self.accessions:
+                accession, label, e_value = line[:3]
+                self.__setitem__(accession, [accession, label, e_value])
 
 def is_hex_colour(hex_str):
     """
