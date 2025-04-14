@@ -490,6 +490,19 @@ function plot(data) {
   // Select file to use as master label file, loop through and assign dynamic match and dynamic short
   d3.select("#input-label-name-path")
     .on("change", function() {
+
+      // Check file size
+      let file = document.getElementById("input-label-name-path").files[0];
+      if (file && file.size > 500 * 1024 * 1024) { // 500MB
+        alert("File is too large. Please upload a file smaller than 500MB.");
+        this.value = "";
+        file = null;
+        return;
+      }
+
+      // Display loading div
+      document.getElementById('loading').style.display = 'block';
+
       if (! labelTypes.has("dynamic_match")) {
 
         labelTypes.add("dynamic_match");
@@ -544,6 +557,7 @@ function plot(data) {
         } else if (lines[0].split("\t").length != 3) {
           // Not a valid label file (not new format b/c no header, not old format b/c not 3 tsv columns)
           alert("Invalid label file. Please ensure it is in the correct format.");
+          document.getElementById("loading").style.display = 'none';
           return;
         }
 
@@ -598,7 +612,7 @@ function plot(data) {
                 // Class label already exists, add accession to it (and make sure the colour is the same)
                 if (classColour != classes[classIdx]["label_map"][classLabel]["colour"]) {
                   if (!alertedSet.has(classLabel)) {
-                    alert("Error: Class label " + classLabel + " has multiple colours assigned to it. Please ensure each label has only one colour. Using the first one in the label file.");               
+                    // alert("Error: Class label " + classLabel + " has multiple colours assigned to it. Please ensure each label has only one colour. Using the first one in the label file.");               
                     alertedSet.add(classLabel);
                   }
                 }
@@ -757,7 +771,7 @@ function plot(data) {
         }
         newClasses[i]["groups"] = groupArr;
 
-        alert("adding class " + newClasses[i]["name"])
+        // alert("adding class " + newClasses[i]["name"])
         data.classes.push(newClasses[i]);
       }
 
@@ -778,6 +792,9 @@ function plot(data) {
       let type = e.options[e.selectedIndex].value;
       d3.selectAll("text.geneLabel").each(d => d.label = d.names[type] ? d.names[type] : d.label)
       plot.call(chart);
+
+      alert("Dynamic labels loaded.");
+      document.getElementById("loading").style.display = "none"; // Hide loading div
     }
 
 
