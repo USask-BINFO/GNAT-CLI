@@ -1,0 +1,6 @@
+#Accession,Label,E_Value,Class_0,Class_0_Colour,Class_1,Class_1_Colour
+accession1,label1,0.0001,class1_label_1,#000000,class2_label_1,#FFFFFF
+accession2,label2,0.0002,class1_label_1,#000000,class2_label_3,#0F0F0F
+accession3,label3,0.0003,class1_label_2,#000001,class2_label_3,#0F0F0F
+accession4,label4,0.0004,class1_label_3,#000002,class2_label_2,#000001
+accession5,label5,0.0005,class1_label_2,#000001,class2_label_1,#FFFFFF

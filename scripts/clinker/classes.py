@@ -491,40 +491,51 @@ class Gene(Serializer):
 
         if gnat_label:
             label_obj = label_obj_container[0]
-            accession_dict = label_obj.accessions
-            if accession_dict is not None:
+            if label_obj is not None:
                 self.names["psi_blast_match"] = None
                 self.names["match_short"] = None
                 self.names["match_very_short"] = None
-                class_labels = {}
+                # class_labels = {}
                 
 
-                if label_obj.classes:
-                    for i, c in enumerate(label_obj.classes):
-                        class_labels[c["label_name"]] = (i, None)
+                # if label_obj.classes:
+                #     for i, c in enumerate(label_obj.classes):
+                #         class_labels[c["label_name"]] = (i, None)
 
 
                 if "protein_id" in self.names:
                     accession = self.names["protein_id"]
-                    if accession in accession_dict:
-                        match_entry = accession_dict[accession]
-                        match_label = match_entry[0]
-                        match_evalue = match_entry[1]
-                        sub_labels = [match_entry[2][l] for l in range(len(match_entry[2])) if l % 2 == 0]
-                        # print(sub_labels)
 
-                        self.names["psi_blast_match"] = f"{accession} ({match_label}, {match_evalue})"
-                        self.names["match_short"] = f"{match_label} ({match_evalue})"
-                        self.names["match_very_short"] = match_label
+                    record = label_obj.get_record(accession)
+                    if record is not None:
+                        split_record = record.rest.split(label_obj.delim)
+
+                        label, e_value = split_record[0], split_record[1]
+
+                        class_labels = []
+                        class_colours = []
+
+                        for i in range(2, len(split_record), 2):
+                            class_labels.append(split_record[i])
+                            class_colours.append(split_record[i + 1])
+
+                        class_names = []
+                        # If we have class labels, extract their names from the header
+                        if len(class_labels) > 0:
+                            split_header = label_obj.header.split(',')
+                            for i in range(2, len(split_header), 2):
+                                class_names.append(split_header[i])
+
+                        self.names["psi_blast_match"] = f"{accession} ({label}, {e_value})"
+                        self.names["match_short"] = f"{label} ({e_value})"
+                        self.names["match_very_short"] = label
 
                         # Add custom labels as text to names
-                        for label_name in class_labels:
-                            idx = class_labels[label_name][0]
-                            if sub_labels[idx] not in [None, '']:
-                                colour = label_obj.classes[idx]["label_map"][sub_labels[idx]]["colour"]
-                                self.names[f"{label_name}_(custom_{str(idx)})"] = f"{sub_labels[idx]} ({colour})"
+                        for i, label_name in enumerate(class_labels):
+                            if class_labels[i] not in [None, '']:
+                                colour = class_colours[i]
+                                self.names[f"{class_names[i]}_(custom_{str(i)})"] = f"{class_labels[i]} ({colour})"
 
-                
 
     def to_dict(self):
         return {

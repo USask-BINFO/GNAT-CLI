@@ -21,7 +21,7 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from label_cls import LabelObject
+from LabelFile import LabelFile
 
 #from clinker import __version__, align
 #from clinker.plot import plot_clusters, plot_data
@@ -48,15 +48,15 @@ def parse_gnat_label_file(label_file_location=None):
     
     :param label_file_location: Location of the label file to parse.
 
-    return: LabelObject (from label_cls.py) containing the parsed label file data.
+    return: LabelObject (from label_cls.py) containing the parsed label file data. # Rough updating to use LabelFile object instead
     """
     if label_file_location == "" or label_file_location is None:
         LOG.warning("No label file provided. GNAT labelling will not be enabled.")
         return None
     
     try:
-        lf_object = LabelObject()
-        lf_object.from_file(label_file_location)
+        lf_object = LabelFile(label_file_location)
+        # lf_object.from_file(label_file_location)
         return lf_object
     
 
@@ -217,30 +217,50 @@ def clinker(
         if "Default" not in [c["name"] for c in globaligner.classes]:
             globaligner.classes.append({"name": "Default", "groups": globaligner.groups})
 
-        if label_obj.is_new:
-            # Build additional groups
-            for i, c in enumerate(label_obj.classes):
-                fn = {}
-                colour_map = {}
+        if len(label_obj.header.split(",")) > 3:
+            n_fn = [{} * (len(label_obj.header.split(',') - 3) // 2)] # A fn dict for each class column
+            n_colour_map = [{} * (len(label_obj.header.split(',') - 3) // 2)] # A colour map for each class column
 
-                name = c["label_name"]
-                label_map = c["label_map"]
+            # Go through all the accessions in the plot, and build the fn and colour maps
+            for cluster in globaligner.clusters:
+                for gene in cluster.genes:
+                    if 'protein_id' in gene.names:
+                        # For each of these accessions, get the label from the label file
+                        record = label_obj.get_record(gene.names['protein_id'])
 
-                for label in label_map:
-                    if label == "" or label == "None":
-                        continue
-                    fn[label] = label_map[label]["accessions"]
-                    colour = label_map[label]["colour"]
-                    if colour.strip() not in [None, "", "None"]:
-                        if label in colour_map:
-                            colour_map[label].append(colour)
-                        else:
-                            colour_map[label] = [colour]
-                    else:
-                        if label in colour_map:
-                            colour_map[label].append("")
-                        else:
-                            colour_map[label] = [""]
+                        if record is not None:
+                            # Split the record into the labels and the classes
+                            split = record.rest.split(",")
+
+                            # Get the label and colour for each class
+                            for i in range(2, len(split), 2):
+                                label = split[i]
+                                colour = split[i + 1]
+                                idx = i // 2 - 1
+
+                                if label in ["", "None", None]:
+                                    continue
+                                else:
+                                    if label in n_fn[idx]:
+                                        n_fn[idx][label].append(gene.names['protein_id'])
+                                    else:
+                                        n_fn[idx][label] = [gene.names['protein_id']]
+
+                                    if colour.strip() in ["", "None", None]:
+                                        colour = ""
+
+                                    if label in n_colour_map[idx]:
+                                        n_colour_map[idx][label].append(colour)
+                                    else:
+                                        n_colour_map[idx][label] = [colour]
+
+            # Go through the fns/colour_maps and build the groups
+            for i in range(len(n_fn)):
+                fn = n_fn[i]
+                colour_map = n_colour_map[i]
+
+                # Get the class name from the header
+                class_name = label_obj.header.split(",")[i * 2 + 3]
 
                 for label in colour_map:
                     if len(colour_map[label]) > 1:
@@ -248,10 +268,7 @@ def clinker(
                     colour_map[label] = colour_map[label][0]
 
                 new_group = globaligner.build_gene_groups_return(functions=fn, colour_map=colour_map, use_links=False, level=i+1)
-
-                globaligner.classes.append({"name": name, "groups": new_group})
-
-
+                globaligner.classes.append({"name": class_name, "groups": new_group})
 
     if globaligner.alignments:
         LOG.info("Generating results summary...")
