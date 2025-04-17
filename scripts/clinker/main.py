@@ -218,41 +218,46 @@ def clinker(
             globaligner.classes.append({"name": "Default", "groups": globaligner.groups})
 
         if len(label_obj.header.split(",")) > 3:
-            n_fn = [{} * (len(label_obj.header.split(',') - 3) // 2)] # A fn dict for each class column
-            n_colour_map = [{} * (len(label_obj.header.split(',') - 3) // 2)] # A colour map for each class column
+            n_fn = [{} for _ in range((len(label_obj.header.split(',')) - 3) // 2)] # A fn dict for each class column
+            n_colour_map = [{} for _ in range((len(label_obj.header.split(',')) - 3) // 2)] # A colour map for each class column
 
             # Go through all the accessions in the plot, and build the fn and colour maps
-            for cluster in globaligner.clusters:
-                for gene in cluster.genes:
-                    if 'protein_id' in gene.names:
-                        # For each of these accessions, get the label from the label file
-                        record = label_obj.get_record(gene.names['protein_id'])
+            # for cluster in globaligner.clusters:
+            #     print(f"Cluster: {cluster}")
+            #     for locus in cluster.loci:
+            #         print(f"Locus: {locus}")
+            #         for gene in locus.genes:
+            #             print(f"Gene: {gene}")
+            for _, gene in globaligner._genes.items():
+                if 'protein_id' in gene.names:
+                    # For each of these accessions, get the label from the label file
+                    record = label_obj.get_record(gene.names['protein_id'])
 
-                        if record is not None:
-                            # Split the record into the labels and the classes
-                            split = record.rest.split(",")
+                    if record is not None:
+                        # Split the record into the labels and the classes
+                        split = record.rest.split(",")
 
-                            # Get the label and colour for each class
-                            for i in range(2, len(split), 2):
-                                label = split[i]
-                                colour = split[i + 1]
-                                idx = i // 2 - 1
+                        # Get the label and colour for each class
+                        for i in range(2, len(split), 2):
+                            label = split[i]
+                            colour = split[i + 1]
+                            idx = i // 2 - 1
 
-                                if label in ["", "None", None]:
-                                    continue
+                            if label in ["", "None", None]:
+                                continue
+                            else:
+                                if label in n_fn[idx]:
+                                    n_fn[idx][label].append(gene.names['protein_id'])
                                 else:
-                                    if label in n_fn[idx]:
-                                        n_fn[idx][label].append(gene.names['protein_id'])
-                                    else:
-                                        n_fn[idx][label] = [gene.names['protein_id']]
+                                    n_fn[idx][label] = [gene.names['protein_id']]
 
-                                    if colour.strip() in ["", "None", None]:
-                                        colour = ""
+                                if colour.strip() in ["", "None", None]:
+                                    colour = ""
 
-                                    if label in n_colour_map[idx]:
-                                        n_colour_map[idx][label].append(colour)
-                                    else:
-                                        n_colour_map[idx][label] = [colour]
+                                if label in n_colour_map[idx]:
+                                    n_colour_map[idx][label].append(colour)
+                                else:
+                                    n_colour_map[idx][label] = [colour]
 
             # Go through the fns/colour_maps and build the groups
             for i in range(len(n_fn)):

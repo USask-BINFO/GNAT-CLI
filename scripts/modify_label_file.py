@@ -41,8 +41,12 @@ if args.parsed:
             accession, eval, label = line.split()[1:4]
 
             # Get the label file delimiter
-            delim = label_file.delim
+            delim = label_file.delim if label_file.delim is not None else '\t'
             line = f"{accession}{delim}{label}{delim}{eval}"
+
+            # Add any neccessary empty columns to the end of the line
+            line += delim * (len(label_file.header.split(',')) - 3)
+
             label_file.add_line(line)
 
 if args.merge_label_file:

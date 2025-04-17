@@ -534,7 +534,10 @@ class Gene(Serializer):
                         for i, label_name in enumerate(class_labels):
                             if class_labels[i] not in [None, '']:
                                 colour = class_colours[i]
-                                self.names[f"{class_names[i]}_(custom_{str(i)})"] = f"{class_labels[i]} ({colour})"
+                                if type(colour) == str and colour.startswith('#'):
+                                    self.names[f"{class_names[i]}_(custom_{str(i)})"] = f"{class_labels[i]} ({colour})"
+                                else:
+                                    self.names[f"{class_names[i]}_(custom_{str(i)})"] = f"{class_labels[i]}"
 
 
     def to_dict(self):
