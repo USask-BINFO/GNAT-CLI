@@ -217,18 +217,13 @@ def clinker(
         if "Default" not in [c["name"] for c in globaligner.classes]:
             globaligner.classes.append({"name": "Default", "groups": globaligner.groups})
 
+        # If the label file has more than 3 columns, we need to build the class labels
         if len(label_obj.header.split(",")) > 3:
-            n_fn = [{} for _ in range((len(label_obj.header.split(',')) - 3) // 2)] # A fn dict for each class column
-            n_colour_map = [{} for _ in range((len(label_obj.header.split(',')) - 3) // 2)] # A colour map for each class column
+            n_label_dict = [{} for _ in range((len(label_obj.header.split(',')) - 3) // 2)] # A label dict for each class column {label: [accessions]}
+            n_colour_map = [{} for _ in range((len(label_obj.header.split(',')) - 3) // 2)] # A colour map for each class column {label: [colour(s)]}
 
-            # Go through all the accessions in the plot, and build the fn and colour maps
-            # for cluster in globaligner.clusters:
-            #     print(f"Cluster: {cluster}")
-            #     for locus in cluster.loci:
-            #         print(f"Locus: {locus}")
-            #         for gene in locus.genes:
-            #             print(f"Gene: {gene}")
-            for _, gene in globaligner._genes.items():
+            # Go through all the accessions in the plot, and build the label dicts and colour maps (i.e., parse out the label file data for the genes present in the plot)
+            for uid, gene in globaligner._genes.items():
                 if 'protein_id' in gene.names:
                     # For each of these accessions, get the label from the label file
                     record = label_obj.get_record(gene.names['protein_id'])
@@ -246,10 +241,11 @@ def clinker(
                             if label in ["", "None", None]:
                                 continue
                             else:
-                                if label in n_fn[idx]:
-                                    n_fn[idx][label].append(gene.names['protein_id'])
+                                # For the label dict, label mapped to accession
+                                if label in n_label_dict[idx]:
+                                    n_label_dict[idx][label].append(gene.names['protein_id'])
                                 else:
-                                    n_fn[idx][label] = [gene.names['protein_id']]
+                                    n_label_dict[idx][label] = [gene.names['protein_id']]
 
                                 if colour.strip() in ["", "None", None]:
                                     colour = ""
@@ -259,18 +255,123 @@ def clinker(
                                 else:
                                     n_colour_map[idx][label] = [colour]
 
+            # Done extracting label file data for the genes in the plot
+
+            # Build the default gene functions (based on homology) using the existing groups
+            default_groups = globaligner.groups
+
+            n_fn = []
+            n_colour_map = []
+            n_new_labels = []
+            for _ in range((len(label_obj.header.split(',')) - 3) // 2):
+                default_fn = {}
+                default_colours = {}
+                default_labels = {}
+                for i in range(len(default_groups)):
+                    group = default_groups[i]
+                    # Get the gene accessions for the group (From the UIDs)
+                    default_fn[group.label] = []
+                    for gene_uid in group.genes:
+                        # Get the gene accession from the UID
+                        gene_acc = globaligner._genes[gene_uid].names['protein_id']
+                        default_fn[group.label].append(gene_acc)
+                    # default_fn[group.label] = group.genes
+                    default_colours[group.label] = [group.colour]
+                    default_labels[group.label] = group.label
+                n_fn.append(default_fn)
+                n_colour_map.append(default_colours)
+                n_new_labels.append(default_labels)
+
+            # Now we have all the data we need to build the new groups (homology extended and non-homologous subclass)
+            # 1 - If a gene from the label file is in a homology group, re-name the homology group to the label (e.g., Group 3 --> "Abi2 (homology)")
+            # 2 - If another gene with a different label from the label file is in the same homology group, prepend it to the label (e.g., Abi2 (homology) --> Abi3 | Abi2 (homology))
+            # 3 - If a gene from the label file isn't in a homology group, create a new group for it in the fn and colour it black
+            #   - If the label is already in the fn, add the gene to it (e.g., if 3 already happened)
+
+            keys = list(n_fn[0].keys())
+            for i in range(len(n_label_dict)):
+                label_dict = n_label_dict[i]
+                colour_map = n_colour_map[i]
+                names = n_new_labels[i]
+                default_fn = n_fn[i]
+
+                acc_to_labels = {v: k for k, vals in label_dict.items() for v in vals}
+                acc_to_group = {v: k for k, vals in default_fn.items() for v in vals}
+
+                # Get a list of all the accessions in the label dict
+                label_gene_accs = []
+                for acc_list in label_dict.values():
+                    label_gene_accs += acc_list
+
+                homology_genes_accs = []
+                for acc_list in default_fn.values():
+                    homology_genes_accs += acc_list
+
+                # Get the intersection of the two lists
+                acc_intersection = set(label_gene_accs).intersection(set(homology_genes_accs))
+                acc_label_rest = set(label_gene_accs) - set(homology_genes_accs)
+                # acc_group_rest = set(homology_genes_accs) - set(label_gene_accs)
+
+                for gene_acc in acc_intersection:
+                    # Get the label for the gene
+                    label = acc_to_labels[gene_acc]
+                    # Get the group for the gene
+                    group = acc_to_group[gene_acc]
+
+                    if names[group] == group:
+                        # Group name hasn't been updated, overwrite it
+                        names[group] = f"{label} (homologous)"
+                    else:
+                        # Group name has already been updated, check if it has the label already
+                        if f"{label} (homologous)" not in names[group] and f"{label} | " not in names[group]:
+                            # Group name has been updated with a different label, add this one to it
+                            names[group] = f"{label} | " + names[group]
+                
+                remove = [] # List of entries to remove from fn (renamed)
+                # Now we need to update the fn and colour map with the new labels
+                for group in keys:
+                    if names[group] == group:
+                        # Group name hasn't been updated, colour it grey
+                        colour_map[group] = ["#808080"]
+                    else:
+                        default_fn[names[group]] = default_fn[group]
+                        remove.append(group)
+                        # Update the colour map with the new label
+                        colour_map[names[group]] = colour_map[group]
+                
+                # Remove the old group names from the fn and colour map
+                for group in remove:
+                    del default_fn[group]
+                    del colour_map[group]
+
+                # Add the rest of the label genes to the fn
+                for gene_acc in acc_label_rest:
+                    # Get the label for the gene
+                    label = acc_to_labels[gene_acc]
+                    # Check if the label is already in the fn
+                    if label in default_fn:
+                        # Label has already been added to the fn, add the gene to it
+                        default_fn[label].append(gene_acc)
+                    else:
+                        # Label hasn't been added to the fn, add it
+                        default_fn[label] = [gene_acc]
+                        # Add the colour to the colour map (black)
+                        colour_map[label] = ["#000000"]
+
+                # Homology genes should already all be in there
+                
             # Go through the fns/colour_maps and build the groups
             for i in range(len(n_fn)):
                 fn = n_fn[i]
                 colour_map = n_colour_map[i]
 
+                for group_name in fn:
+                    if len(colour_map[group_name]) > 1:
+                        LOG.warning(f"Label {group_name} has more than one colour assigned: {colour_map[group_name]}. Using first one.")
+                    colour_map[group_name] = colour_map[group_name][0]
+
                 # Get the class name from the header
                 class_name = label_obj.header.split(",")[i * 2 + 3]
-
-                for label in colour_map:
-                    if len(colour_map[label]) > 1:
-                        LOG.warning(f"Label {label} has more than one colour assigned: {colour_map[label]}. Using first one.")
-                    colour_map[label] = colour_map[label][0]
 
                 new_group = globaligner.build_gene_groups_return(functions=fn, colour_map=colour_map, use_links=False, level=i+1)
                 globaligner.classes.append({"name": class_name, "groups": new_group})

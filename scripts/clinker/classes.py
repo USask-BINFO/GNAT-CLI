@@ -523,7 +523,7 @@ class Gene(Serializer):
                         # If we have class labels, extract their names from the header
                         if len(class_labels) > 0:
                             split_header = label_obj.header.split(',')
-                            for i in range(2, len(split_header), 2):
+                            for i in range(3, len(split_header), 2):
                                 class_names.append(split_header[i])
 
                         self.names["psi_blast_match"] = f"{accession} ({label}, {e_value})"
