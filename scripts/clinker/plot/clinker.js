@@ -338,24 +338,26 @@ function plot(data) {
       // console.log(data.groups)
       // console.log(data.classes)
 
+      // Wipe data.groups
       data.groups = [];
 
+      // Add each group from the selected class (index) to data.groups
       for (let i = 0; i < data.classes[groupIdx].groups.length; i++) {
         data.classes[groupIdx].groups[i].hidden = false;
         data.groups.push(data.classes[groupIdx].groups[i]);
       }
     }
 
-    if (type != "Default") {
-      // Make sure links isn't already empty
-      if (data.links.length > 0) {
-        data.oldLinks = data.links;
-        data.links = [];
-      }
-    } else {
-      data.links = data.oldLinks;
-      data.oldLinks = [];
-    }
+    // if (type != "Default") {
+    //   // Make sure links isn't already empty
+    //   if (data.links.length > 0) {
+    //     data.oldLinks = data.links;
+    //     data.links = [];
+    //   }
+    // } else {
+    //   data.links = data.oldLinks;
+    //   data.oldLinks = [];
+    // }
 
     plot.call(chart);
     boldGroupSetUp();
