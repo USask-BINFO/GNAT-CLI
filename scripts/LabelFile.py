@@ -118,6 +118,9 @@ class LabelFile:
                     header_string += f",Class_{i // 2}_Colour"
         return header_string
     
+    def __len__(self):
+        return len(self.sorted_list)
+
     def output_string(self):
         """
         Output the string representation of the label file.

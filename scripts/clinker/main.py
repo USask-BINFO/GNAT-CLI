@@ -218,7 +218,7 @@ def clinker(
             globaligner.classes.append({"name": "Default", "groups": globaligner.groups})
 
         # If the label file has more than 3 columns, we need to build the class labels
-        if len(label_obj.header.split(",")) > 3:
+        if label_obj is not None and len(label_obj) > 0 and len(label_obj.header.split(",")) > 3:
             n_label_dict = [{} for _ in range((len(label_obj.header.split(',')) - 3) // 2)] # A label dict for each class column {label: [accessions]}
             n_colour_map = [{} for _ in range((len(label_obj.header.split(',')) - 3) // 2)] # A colour map for each class column {label: [colour(s)]}
 
