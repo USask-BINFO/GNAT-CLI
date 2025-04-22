@@ -582,6 +582,7 @@ function plot(data) {
             
             let lineClasses = splitLine.slice(3,);
 
+            // Check if the accession is already in the accessions dict (if it is, replace the old one if the e-value is lower)
             if (accession in accessions) {
               if (accessions[accession][1] > evalue) {
                 replaceDupe = true;
@@ -589,11 +590,11 @@ function plot(data) {
               } else {
                 continue;
               }
-            } else {
+            } else { // New accession, add the line
               accessions[accession] = [label, evalue, lineClasses];
             }
 
-            if (replaceDupe) {
+            if (replaceDupe) { // Replace dupe flag to replace the old class labels with the new ones
               for (let j=0; j < lineClasses.length; j++) {
                 let classIdx = j/2;
                 let classLabel = lineClasses[j];
@@ -604,7 +605,7 @@ function plot(data) {
               }
             }
 
-
+            // Add the new class data to the classes dict
             for (let j=3; j < splitLine.length; j+=2) {
               let classIdx = (j - 3)/2;
               let classLabel = splitLine[j];
@@ -642,96 +643,344 @@ function plot(data) {
               if (accessions[accession][1] > evalue) {
                 accessions[accession] = [label, evalue];
               }
-          } else {
-            accessions[accession] = [label, evalue];
-          }
-        }
-      }
-
-      let label_obj = {"isNew": isNew, "labels": accessions, "class_labels": classes};
-
-      // Assign the labels to the genes
-      let matchDict = label_obj["labels"];
-      let newFlag = label_obj["isNew"];
-
-      // Don't need label_obj for anything else
-      label_obj = null;
-
-      let classDicts = [];
-      let newClasses = [];
-
-      // Build an O(1) lookup dict for each class (accession: (class_label, class_colour))
-      for (let i=0; i < class_names.length; i++) {
-        let classDict = {};
-        for (let label in classes[i]["label_map"]) {
-          if (label == "" || label == null || label == " ") { continue; }
-          for (let acc of classes[i]["label_map"][label]["accessions"]) {
-            // alert("Accession: " + acc + " Label: " + label)
-            let colour = classes[i]["label_map"][label]["colour"];
-            // Make sure the colour is valid
-            if (colour == "" || colour == null || colour == " " || colour[0] != "#") {
-              colour = "";
+            } else {
+              accessions[accession] = [label, evalue];
             }
-            // alert("For accession " + acc + " label is " + label + " and colour is " + colour)
-            classDict[acc] = [label, colour];
+          } 
+        }
+
+        // TODO: Continue from here tomorrow
+        let label_obj = {"isNew": isNew, "labels": accessions, "class_labels": classes};
+
+        // Build a label and colour map for each class column
+        let n_label_dict = [];
+        // let n_colour_map = [];
+        for (let i=0; i < class_names.length; i++) {
+          n_label_dict.push({});
+          // n_colour_map.push({});
+        }
+
+        // Loop through all the genes in the plot, and build the label dicts and colour maps (i.e., parse out the label file data for the genes present in the plot)
+        for (cluster of data.clusters) {
+          for (locus of cluster.loci) {
+            for (gene of locus.genes) {
+              // Check if the gene is in the label file
+              if ("protein_id" in gene.names) {
+                if (gene.names["protein_id"] in accessions) {
+                  let label = accessions[gene.names["protein_id"]][0];
+                  let evalue = accessions[gene.names["protein_id"]][1];
+
+                  for (let i = 0; i < class_names.length; i++) {
+                    let groupLabel = accessions[gene.names["protein_id"]][2][i*2];
+                    let groupColour = accessions[gene.names["protein_id"]][2][i*2+1];
+
+                    if (!(groupColour != "" && groupColour != null && groupColour != " " && groupColour != "None" && groupColour[0] == "#")) {
+                      groupColour = "";
+                    }
+
+                    if (groupLabel != "" && groupLabel != null && groupLabel != " ") {
+                      if (groupLabel in n_label_dict[i]) {
+                        n_label_dict[i][groupLabel].push(gene.uid);
+                        // if (n_colour_map[i][groupLabel] == null || n_colour_map[i][groupLabel] == "") {
+                        //   n_colour_map[i][groupLabel] = groupColour;
+                        // }
+                      } else {
+                        n_label_dict[i][groupLabel] = [gene.uid];
+                        // n_colour_map[i][groupLabel] = groupColour;
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
-        classDicts.push(classDict);
-        newClasses.push({"name": class_names[i], "groups": {}});
-      }
 
-      // Build the new dynamic label names
-      let labelNames = [];
-      if (newFlag) {
-        for (let i=0; i<classDicts.length; i++) {
-          let labelName = class_names[i];
-          labelName = labelName.replace("Dynamic_", "");
-          labelName += "_(dynamic_custom_" + i + ")";
-          labelNames.push(labelName);
+        // Done extracting the specific label file data for the genes in the plot
+
+        // Build the default (homology) label and colour maps
+        let n_uid_fn = [];
+        let n_default_colour_map = [];
+        let n_default_labels = [];
+
+        for (let i=0; i < class_names.length; i++) {
+          let uid_fn = {};
+          let default_colour_map = {};
+          let default_labels = {};
+
+          for (group of data.groups) {
+            // Get the UIDs for each gene in the group
+            for (geneUID of group.genes) {
+              if (group.label in uid_fn) {
+                uid_fn[group.label].push(geneUID);
+              } else {
+                uid_fn[group.label] = [geneUID];
+              }
+            }
+
+            let strippedColour = null;
+            if (group.colour != null && group.colour.length > 3) { // Check if the colour is rgb
+              if (group.colour.includes("rgb(")) {
+                strippedColour = group.colour;
+                default_colour_map[group.label] = [strippedColour];
+              }
+            }
+
+            if (strippedColour == null || strippedColour == "") { // If the colour isn't rgb, check if it's a hex colour
+              strippedColour = "#" + group.colour.replace(/[^0-9a-fA-F]/g, "");
+              if (strippedColour != "#" && strippedColour != null && strippedColour != " ") {
+                default_colour_map[group.label] = [strippedColour];
+              } else {
+                default_colour_map[group.label] = [""];
+              }
+            }
+
+            default_labels[group.label] = group.label;
+          }
+          n_uid_fn.push(uid_fn);
+          n_default_colour_map.push(default_colour_map);
+          n_default_labels.push(default_labels);
         }
 
-        // Add the new label names to the dropdown
-        for (let name of labelNames) {
-          let newLabel = document.createElement("option");
-          newLabel.setAttribute("value", name);
-          newLabel.textContent = name.replaceAll("_", " ");
-          document.getElementById("select-label-type").appendChild(newLabel);
-        }
-      }
+        // Now we have all the data we need to build the new groups (homology extended and non-homologous subclass)
+        // 1 - If a gene from the label file is in a homology group, re-name the homology group to the label (e.g., Group 3 --> "Abi2 (dynamic homologous)")
+        // 2 - If another gene with a different label from the label file is in the same homology group, prepend it to the label (e.g., Abi2 (dynamic homologous) --> Abi3 | Abi2 (dynamic homologous))
+        // 3 - If a gene from the label file isn't in a homology group, create a new group for it in the fn and colour it black
+        //   - If the label is already in the fn, add the gene to it (e.g., if 3 already happened)
 
-      for (cluster of data.clusters) {
-        for (locus of cluster.loci) {
-          for (gene of locus.genes) {
-            let flag = false;
-            if ("protein_id" in gene.names) {
-              const pId = gene.names["protein_id"];
+        let keys = Object.keys(n_uid_fn[0]);
+        for (let i = 0; i < n_label_dict.length; i++) {
+          let labelDict = n_label_dict[i];
+          let colourMap = n_default_colour_map[i];
+          let names = n_default_labels[i];
+          let defaultFN = n_uid_fn[i];
+
+          let uid_to_labels = {};
+          let uid_to_group = {};
+
+          // Flip the keys and values in the two dicts
+          for (let newLabel in labelDict) {
+            let groupUIDs = labelDict[newLabel];
+            for (let uid of groupUIDs) {
+              uid_to_labels[uid] = newLabel;
+            }
+          }
+
+          for (let groupLabel in defaultFN) {
+            let groupUIDs = defaultFN[groupLabel];
+            for (let uid of groupUIDs) {
+              uid_to_group[uid] = groupLabel;
+            }
+          }
+
+          // Get a list of all the UIDs in the label dict
+          let labelUIDs = [];
+          for (let label in labelDict) {
+            for (let uid of labelDict[label]) {
+              labelUIDs.push(uid);
+            }
+          }
+          let groupUIDs = [];
+          for (let groupLabel in defaultFN) {
+            for (let uid of defaultFN[groupLabel]) {
+              groupUIDs.push(uid);
+            }
+          }
+
+          // Get the intersection of the two lists
+          let intersection = labelUIDs.filter(uid => groupUIDs.includes(uid));
+          let labelRest = labelUIDs.filter(uid => !groupUIDs.includes(uid));
+
+          for (let uid of intersection) {
+            let label = uid_to_labels[uid];
+            let group = uid_to_group[uid];
+
+            if (names[group] == group) {
+              // Group name hasn't been updated, overwrite it
+              names[group] = label + " (dynamic homologous)";
+            } else {
+              // Group name has been updated, check if it has the label already
+              if (!(names[group].includes(label + " (dynamic homologous)") || names[group].includes(label + " | "))) {
+                // Group name has been updated with a different label, add this one to it
+                names[group] = label + " | " + names[group];
+              }
+            }
+          }
+
+          let remove = []; // List of entries to remove from fn (renamed)
+
+          // Update colour map with new labels
+          for (let group of keys) {
+            if (names[group] == group) {
+              // Group name not updated, colour it grey
+              colourMap[group] = ["#808080"];
+            } else {
+              defaultFN[names[group]] = defaultFN[group];
+              remove.push(group);
+              // Update colour map with new label
+              colourMap[names[group]] = colourMap[group];
+            }
+          }
+
+          // Remove the old labels from the maps
+          for (let group of remove) {
+            delete defaultFN[group];
+            delete colourMap[group];
+          }
+
+          // Add the rest of the label genes to the fn
+          for (uid of labelRest) {
+            label = uid_to_labels[uid] + " (dynamic)";
+            
+            if (label in defaultFN) {
+              defaultFN[label].push(uid);
+            } else {
+              // Add label to fn, set colour to black
+              defaultFN[label] = [uid];
+              colourMap[label] = ["#000000"];
+            }
+          }
+
+          // Homology (group) genes should already be in there
+        }
+
+        // n_groups = [];
+
+        // Go through the FNs/Colour Maps and build the groups
+        for (let i=0; i < n_uid_fn.length; i++) {
+          fn = n_uid_fn[i];
+          colourMap = n_default_colour_map[i];
+          groups = [];
+
+          // alert("FN: " + JSON.stringify(fn));
+          // alert("Colour Map: " + JSON.stringify(colourMap));
+          // alert("Names: " + JSON.stringify(n_default_labels[i]));
+          // alert("Class name: " + class_names[i]);
+
+          for (let groupLabel in fn) {
+            if (groupLabel in colourMap && colourMap[groupLabel].length > 1) {
+              // If the group label has more than one colour, set it to the first one
+              alert("Warning: Group label " + groupLabel + " has multiple colours assigned to it. Using the first one in the label file.");
+            } else if (!(groupLabel in colourMap)) {
+              alert(groupLabel + " not in colour map");
+              colourMap[groupLabel] = ["#808080"]
+            }
+
+            colourMap[groupLabel] = colourMap[groupLabel][0];
+
+            newGroup = {
+              "uid": "dynamic-group-" + i + "-" + groupLabel,
+              "label": groupLabel,
+              "genes": fn[groupLabel],
+              "hidden": true,
+              "colour": colourMap[groupLabel]
+            }
+
+            // Add the group to the groups array
+            groups.push(newGroup);
+          }
+      
+          // n_groups.push({"name": class_names[i], "groups": groups});
+          alert("Adding class number " + i + " with " + groups.length + " groups. Class label: " + class_names[i]);
+          data.classes.push({"name": class_names[i], "groups": groups}); // Add the new classes to the data object
+        }
+
+        // Assign the labels to the genes
+        let matchDict = label_obj["labels"];
+        let newFlag = label_obj["isNew"];
+
+        // Don't need label_obj for anything else
+        label_obj = null;
+
+        let classDicts = [];
+
+        for (let i=0; i < n_label_dict.length; i++) {
+          // Flip the keys and values in the label dict
+          let labelDict = n_label_dict[i];
+          let classDict = {};
+          for (let label in labelDict) {
+            let labelUIDs = labelDict[label];
+            for (let uid of labelUIDs) {
+              classDict[uid] = label;
+            }
+          }
+          classDicts.push(classDict);
+        }
+      // let newClasses = [];
+
+      // // Build an O(1) lookup dict for each class (accession: (class_label, class_colour))
+      // for (let i=0; i < class_names.length; i++) {
+      //   let classDict = {};
+      //   for (let label in classes[i]["label_map"]) {
+      //     if (label == "" || label == null || label == " ") { continue; }
+      //     for (let acc of classes[i]["label_map"][label]["accessions"]) {
+      //       // alert("Accession: " + acc + " Label: " + label)
+      //       let colour = classes[i]["label_map"][label]["colour"];
+      //       // Make sure the colour is valid
+      //       if (colour == "" || colour == null || colour == " " || colour[0] != "#") {
+      //         colour = "";
+      //       }
+      //       // alert("For accession " + acc + " label is " + label + " and colour is " + colour)
+      //       classDict[acc] = [label, colour];
+      //     }
+      //   }
+      //   classDicts.push(classDict);
+      //   newClasses.push({"name": class_names[i], "groups": {}});
+      // }
+
+        // Build the new dynamic label names
+        let labelNames = [];
+        if (newFlag) {
+          for (let i=0; i<classDicts.length; i++) {
+            let labelName = class_names[i];
+            labelName = labelName.replace("Dynamic_", "");
+            labelName += "_(dynamic_custom_" + i + ")";
+            labelNames.push(labelName);
+          }
+
+          // Add the new label names to the dropdown
+          for (let name of labelNames) {
+            let newLabel = document.createElement("option");
+            newLabel.setAttribute("value", name);
+            newLabel.textContent = name.replaceAll("_", " ");
+            document.getElementById("select-label-type").appendChild(newLabel);
+          }
+        }
+
+        for (cluster of data.clusters) {
+          for (locus of cluster.loci) {
+            for (gene of locus.genes) {
+              let flag = false;
+              let geneUID = gene.uid;
+          // if ("protein_id" in gene.names) {
+          //   const pId = gene.names["protein_id"];
               if (newFlag) {
                 // Label file is in the new format, add text class labels
                 for (let i=0; i<classDicts.length; i++) {
-                  if (pId in classDicts[i]) {
-                    gene.names[labelNames[i]] = classDicts[i][pId][0];
+                  if (geneUID in classDicts[i]) {
+                    gene.names[labelNames[i]] = classDicts[i][geneUID];
 
-                    // TODO: ADD THIS GENE TO A GROUPS ARRAY (for its class)
-                    // If label is not in the groups dict, add it
-                    let label = classDicts[i][pId][0];
-                    if (!(label in newClasses[i]["groups"])) {
-                      newClasses[i]["groups"][label] = {"uid": null, "label": label, "genes": [gene.uid], "colour": null, "level": i, "products": [], "groupNum": null, "hidden": true};
-                    } else {
-                      newClasses[i]["groups"][label]["genes"].push(gene.uid);
-                    }
+                // TODO: ADD THIS GENE TO A GROUPS ARRAY (for its class)
+                // If label is not in the groups dict, add it
+                // let label = classDicts[i][geneUID][0];
+                // if (!(label in newClasses[i]["groups"])) {
+                //   newClasses[i]["groups"][label] = {"uid": null, "label": label, "genes": [gene.uid], "colour": null, "level": i, "products": [], "groupNum": null, "hidden": true};
+                // } else {
+                //   newClasses[i]["groups"][label]["genes"].push(gene.uid);
+                // }
 
-                    if (newClasses[i]["groups"][label]["colour"] === null) {
-                      let colour = classDicts[i][pId][1];
-                      if (colour != "" && colour != null && colour != " " && colour[0] == "#") {
-                        newClasses[i]["groups"][label]["colour"] = colour;
-                      }
-                    }
-                    // if (newClasses[i]["colour"] === null) {
-                    //   let colour = classDicts[i][pId][1];
-                    //   if (colour != "" && colour != null && colour != " " && colour[0] == "#") {
-                    //     newClasses[i]["colour"] = colour;
-                    //   }
-                    // }
+                // if (newClasses[i]["groups"][label]["colour"] === null) {
+                //   let colour = classDicts[i][geneUID][1];
+                //   if (colour != "" && colour != null && colour != " " && colour[0] == "#") {
+                //     newClasses[i]["groups"][label]["colour"] = colour;
+                //   }
+                // }
+                // if (newClasses[i]["colour"] === null) {
+                //   let colour = classDicts[i][pId][1];
+                //   if (colour != "" && colour != null && colour != " " && colour[0] == "#") {
+                //     newClasses[i]["colour"] = colour;
+                //   }
+                // }
 
                   } else {
                     gene.names[labelNames[i]] = "";
@@ -739,70 +988,73 @@ function plot(data) {
                 }
               }
 
-
-              if (gene.names["protein_id"] in matchDict) {
+              // Add the normal dynamic text labels
+              if ("protein_id" in gene.names && gene.names["protein_id"] in matchDict) {
                 const pId = gene.names["protein_id"]
                 gene.names["dynamic_match"] = pId + " (" + matchDict[pId][0] + ", " + matchDict[pId][1] + ")";
                 gene.names["dynamic_short"] = matchDict[pId][0] + " (" + matchDict[pId][1] + ")";
                 gene.names["dynamic_very_short"] = matchDict[pId][0]
               } else { flag = true }
-            } else { flag = true }
-            if (flag) {
-              gene.names["dynamic_match"] = "";
-              gene.names["dynamic_short"] = "";
-              gene.names["dynamic_very_short"] = "";
-            }
+
+              if (flag) {
+                gene.names["dynamic_match"] = "";
+                gene.names["dynamic_short"] = "";
+                gene.names["dynamic_very_short"] = "";
+              }
+            } 
+            // else { flag = true }
+            // if (flag) {
+            //   gene.names["dynamic_match"] = "";
+            //   gene.names["dynamic_short"] = "";
+            //   gene.names["dynamic_very_short"] = "";
+            // }
           }
         }
-      }
 
-      // TODO: ADD EACH OF THE GROUPS ARRAYS TO THE DATA OBJECT
-      for (let i=0; i < newClasses.length; i++) {
-        // Loop through the keys in the groups dict
-        for (let key in newClasses[i]["groups"]) {
-          // Add the groups to an array
-          newClasses[i]["groups"][key]["uid"] = "dynamic-group-" + i + "-" + key;
-        }
+      // // TODO: ADD EACH OF THE GROUPS ARRAYS TO THE DATA OBJECT
+      // for (let i=0; i < newClasses.length; i++) {
+      //   // Loop through the keys in the groups dict
+      //   for (let key in newClasses[i]["groups"]) {
+      //     // Add the groups to an array
+      //     newClasses[i]["groups"][key]["uid"] = "dynamic-group-" + i + "-" + key;
+      //   }
 
-        // Change the group dict to a group array
-        let groupArr = [];
-        for (let key in newClasses[i]["groups"]) {
-          let name = key;
-          newClasses[i]["groups"][key]["name"] = name;
-          groupArr.push(newClasses[i]["groups"][key]);
-        }
-        newClasses[i]["groups"] = groupArr;
+      //   // Change the group dict to a group array
+      //   let groupArr = [];
+      //   for (let key in newClasses[i]["groups"]) {
+      //     let name = key;
+      //     newClasses[i]["groups"][key]["name"] = name;
+      //     groupArr.push(newClasses[i]["groups"][key]);
+      //   }
+      //   newClasses[i]["groups"] = groupArr;
 
-        // alert("adding class " + newClasses[i]["name"])
-        data.classes.push(newClasses[i]);
-      }
+      //   // alert("adding class " + newClasses[i]["name"])
+      //   data.classes.push(newClasses[i]);
+      // }
 
       // TODO: ADD DROPDOWN ELEMENTS FOR EACH NEW DYNAMIC GROUP
       // Add the new class labels to the dropdown
-      for (let i = 0; i < class_names.length; i++) {
-        let newClass = newClasses[i];
-        let newClassName = newClass["name"];
-        let newOption = document.createElement("option");
-        newOption.setAttribute("value", newClassName);
-        newOption.textContent = newClassName;
-        document.getElementById("select-label-class").appendChild(newOption);
+        for (let i = 0; i < class_names.length; i++) {
+          let newClassName = class_names[i];
+          let newOption = document.createElement("option");
+          newOption.setAttribute("value", newClassName);
+          newOption.textContent = newClassName;
+          document.getElementById("select-label-class").appendChild(newOption);
 
+        }
+
+        d3.selectAll("text.geneLabel").each(d => d.label = " ");
+        let e = document.getElementById("select-label-type");
+        let type = e.options[e.selectedIndex].value;
+        d3.selectAll("text.geneLabel").each(d => d.label = d.names[type] ? d.names[type] : d.label)
+        plot.call(chart);
+
+        alert("Dynamic labels loaded.");
+        document.getElementById("loading").style.display = "none"; // Hide loading div
       }
-
-      d3.selectAll("text.geneLabel").each(d => d.label = " ");
-      let e = document.getElementById("select-label-type");
-      let type = e.options[e.selectedIndex].value;
-      d3.selectAll("text.geneLabel").each(d => d.label = d.names[type] ? d.names[type] : d.label)
-      plot.call(chart);
-
-      alert("Dynamic labels loaded.");
-      document.getElementById("loading").style.display = "none"; // Hide loading div
-    }
 
 
     fr.readAsText(document.getElementById("input-label-name-path").files[0]);
-
-
 
   });
   //-------------------------------------------------------------------------------------------------------------------

@@ -220,7 +220,7 @@ def clinker(
         # If the label file has more than 3 columns, we need to build the class labels
         if label_obj is not None and len(label_obj) > 0 and len(label_obj.header.split(",")) > 3:
             n_label_dict = [{} for _ in range((len(label_obj.header.split(',')) - 3) // 2)] # A label dict for each class column {label: [accessions]}
-            n_colour_map = [{} for _ in range((len(label_obj.header.split(',')) - 3) // 2)] # A colour map for each class column {label: [colour(s)]}
+            # n_colour_map = [{} for _ in range((len(label_obj.header.split(',')) - 3) // 2)] # A colour map for each class column {label: [colour(s)]}
 
             # Go through all the accessions in the plot, and build the label dicts and colour maps (i.e., parse out the label file data for the genes present in the plot)
             for uid, gene in globaligner._genes.items():
@@ -247,13 +247,13 @@ def clinker(
                                 else:
                                     n_label_dict[idx][label] = [gene.names['protein_id']]
 
-                                if colour.strip() in ["", "None", None]:
-                                    colour = ""
+                                # if colour.strip() in ["", "None", None]:
+                                #     colour = ""
 
-                                if label in n_colour_map[idx]:
-                                    n_colour_map[idx][label].append(colour)
-                                else:
-                                    n_colour_map[idx][label] = [colour]
+                                # if label in n_colour_map[idx]:
+                                #     n_colour_map[idx][label].append(colour)
+                                # else:
+                                #     n_colour_map[idx][label] = [colour]
 
             # Done extracting label file data for the genes in the plot
 
@@ -273,7 +273,11 @@ def clinker(
                     default_fn[group.label] = []
                     for gene_uid in group.genes:
                         # Get the gene accession from the UID
-                        gene_acc = globaligner._genes[gene_uid].names['protein_id']
+                        if 'protein_id' in globaligner._genes[gene_uid].names:
+                            # If the gene has a protein ID, use that
+                            gene_acc = globaligner._genes[gene_uid].names['protein_id']
+                        else:
+                            gene_acc = gene_uid # Make sure this works TODO
                         default_fn[group.label].append(gene_acc)
                     # default_fn[group.label] = group.genes
                     default_colours[group.label] = [group.colour]
