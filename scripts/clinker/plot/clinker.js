@@ -852,11 +852,6 @@ function plot(data) {
           colourMap = n_default_colour_map[i];
           groups = [];
 
-          // alert("FN: " + JSON.stringify(fn));
-          // alert("Colour Map: " + JSON.stringify(colourMap));
-          // alert("Names: " + JSON.stringify(n_default_labels[i]));
-          // alert("Class name: " + class_names[i]);
-
           for (let groupLabel in fn) {
             if (groupLabel in colourMap && colourMap[groupLabel].length > 1) {
               // If the group label has more than one colour, set it to the first one
@@ -880,8 +875,6 @@ function plot(data) {
             groups.push(newGroup);
           }
       
-          // n_groups.push({"name": class_names[i], "groups": groups});
-          alert("Adding class number " + i + " with " + groups.length + " groups. Class label: " + class_names[i]);
           data.classes.push({"name": class_names[i], "groups": groups}); // Add the new classes to the data object
         }
 
@@ -906,27 +899,6 @@ function plot(data) {
           }
           classDicts.push(classDict);
         }
-      // let newClasses = [];
-
-      // // Build an O(1) lookup dict for each class (accession: (class_label, class_colour))
-      // for (let i=0; i < class_names.length; i++) {
-      //   let classDict = {};
-      //   for (let label in classes[i]["label_map"]) {
-      //     if (label == "" || label == null || label == " ") { continue; }
-      //     for (let acc of classes[i]["label_map"][label]["accessions"]) {
-      //       // alert("Accession: " + acc + " Label: " + label)
-      //       let colour = classes[i]["label_map"][label]["colour"];
-      //       // Make sure the colour is valid
-      //       if (colour == "" || colour == null || colour == " " || colour[0] != "#") {
-      //         colour = "";
-      //       }
-      //       // alert("For accession " + acc + " label is " + label + " and colour is " + colour)
-      //       classDict[acc] = [label, colour];
-      //     }
-      //   }
-      //   classDicts.push(classDict);
-      //   newClasses.push({"name": class_names[i], "groups": {}});
-      // }
 
         // Build the new dynamic label names
         let labelNames = [];
@@ -952,36 +924,12 @@ function plot(data) {
             for (gene of locus.genes) {
               let flag = false;
               let geneUID = gene.uid;
-          // if ("protein_id" in gene.names) {
-          //   const pId = gene.names["protein_id"];
+
               if (newFlag) {
                 // Label file is in the new format, add text class labels
                 for (let i=0; i<classDicts.length; i++) {
                   if (geneUID in classDicts[i]) {
                     gene.names[labelNames[i]] = classDicts[i][geneUID];
-
-                // TODO: ADD THIS GENE TO A GROUPS ARRAY (for its class)
-                // If label is not in the groups dict, add it
-                // let label = classDicts[i][geneUID][0];
-                // if (!(label in newClasses[i]["groups"])) {
-                //   newClasses[i]["groups"][label] = {"uid": null, "label": label, "genes": [gene.uid], "colour": null, "level": i, "products": [], "groupNum": null, "hidden": true};
-                // } else {
-                //   newClasses[i]["groups"][label]["genes"].push(gene.uid);
-                // }
-
-                // if (newClasses[i]["groups"][label]["colour"] === null) {
-                //   let colour = classDicts[i][geneUID][1];
-                //   if (colour != "" && colour != null && colour != " " && colour[0] == "#") {
-                //     newClasses[i]["groups"][label]["colour"] = colour;
-                //   }
-                // }
-                // if (newClasses[i]["colour"] === null) {
-                //   let colour = classDicts[i][pId][1];
-                //   if (colour != "" && colour != null && colour != " " && colour[0] == "#") {
-                //     newClasses[i]["colour"] = colour;
-                //   }
-                // }
-
                   } else {
                     gene.names[labelNames[i]] = "";
                   }
@@ -1002,37 +950,9 @@ function plot(data) {
                 gene.names["dynamic_very_short"] = "";
               }
             } 
-            // else { flag = true }
-            // if (flag) {
-            //   gene.names["dynamic_match"] = "";
-            //   gene.names["dynamic_short"] = "";
-            //   gene.names["dynamic_very_short"] = "";
-            // }
           }
         }
 
-      // // TODO: ADD EACH OF THE GROUPS ARRAYS TO THE DATA OBJECT
-      // for (let i=0; i < newClasses.length; i++) {
-      //   // Loop through the keys in the groups dict
-      //   for (let key in newClasses[i]["groups"]) {
-      //     // Add the groups to an array
-      //     newClasses[i]["groups"][key]["uid"] = "dynamic-group-" + i + "-" + key;
-      //   }
-
-      //   // Change the group dict to a group array
-      //   let groupArr = [];
-      //   for (let key in newClasses[i]["groups"]) {
-      //     let name = key;
-      //     newClasses[i]["groups"][key]["name"] = name;
-      //     groupArr.push(newClasses[i]["groups"][key]);
-      //   }
-      //   newClasses[i]["groups"] = groupArr;
-
-      //   // alert("adding class " + newClasses[i]["name"])
-      //   data.classes.push(newClasses[i]);
-      // }
-
-      // TODO: ADD DROPDOWN ELEMENTS FOR EACH NEW DYNAMIC GROUP
       // Add the new class labels to the dropdown
         for (let i = 0; i < class_names.length; i++) {
           let newClassName = class_names[i];
