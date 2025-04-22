@@ -536,7 +536,6 @@ function plot(data) {
         let isNew = false;
         let header = "";
         let startIdx = 0;
-        let classes = null;
         let class_names = null;
 
         let t = fr.result;
@@ -549,12 +548,10 @@ function plot(data) {
           startIdx = 1;
 
           // Create an array of dictionaries to store the n class type dicts for each gene (where n is (len(splitLine) - 3 )/2)
-          classes = [];
           class_names = [];
 
           for (let i = 3; i < header.length; i+=2) {
             class_names.push("Dynamic_" + header[i]);
-            classes.push({"label_name": "Dynamic_" + header[i], "label_map": {}});
           }
         } else if (lines[0].split("\t").length != 3) {
           // Not a valid label file (not new format b/c no header, not old format b/c not 3 tsv columns)
@@ -563,13 +560,10 @@ function plot(data) {
           return;
         }
 
-
-        let alertedSet = new Set(); // Store the labels we've already notified have messed up colours so user doesn't get spammed with a million notifications
         for (let i = startIdx; i < lines.length; i++) {
           if (isNew) {
             // New format (csv, has header and >=3 columns)
             let splitLine = lines[i].split(",");
-            let replaceDupe = false; // Flag to replace duplicate accessions' class labels with the lower e-value's ones
 
             let accession = splitLine[0];
             let label = splitLine[1];
@@ -593,44 +587,6 @@ function plot(data) {
             } else { // New accession, add the line
               accessions[accession] = [label, evalue, lineClasses];
             }
-
-            if (replaceDupe) { // Replace dupe flag to replace the old class labels with the new ones
-              for (let j=0; j < lineClasses.length; j++) {
-                let classIdx = j/2;
-                let classLabel = lineClasses[j];
-
-                if (splitLine[j+3] != "" && accession in classes[classIdx]["label_map"][classLabel]["accessions"]) {
-                  classes[classIdx]["label_map"][classLabel]["accessions"] = classes[classIdx]["label_map"][classLabel]["accessions"].filter(acc => acc !== accession);
-                }
-              }
-            }
-
-            // Add the new class data to the classes dict
-            for (let j=3; j < splitLine.length; j+=2) {
-              let classIdx = (j - 3)/2;
-              let classLabel = splitLine[j];
-              let classColour = splitLine[j+1];
-
-              if (classLabel in classes[classIdx]["label_map"]) {
-                // Class label already exists, add accession to it (and make sure the colour is the same)
-                if (classColour != classes[classIdx]["label_map"][classLabel]["colour"]) {
-                  if (!alertedSet.has(classLabel)) {
-                    // alert("Error: Class label " + classLabel + " has multiple colours assigned to it. Please ensure each label has only one colour. Using the first one in the label file.");               
-                    alertedSet.add(classLabel);
-                  }
-                }
-
-
-                // Double check that the accession isn't already in the class label (if it is, something is wrong)
-                if (accession in classes[classIdx]["label_map"][classLabel]["accessions"]) {
-                  alert("Error: Accession " + accession + " is already assigned to class label " + classLabel + ". Please ensure each accession is only assigned to one class label. If this error occurred, something is very wrong");
-                  return;
-                }
-                classes[classIdx]["label_map"][classLabel]["accessions"].push(accession);
-              } else {
-                classes[classIdx]["label_map"][classLabel] = {"colour": classColour, "accessions": [accession]};
-              }
-            }
           } else {
             // Old format
             let splitLine = lines[i].split("\t");
@@ -649,9 +605,6 @@ function plot(data) {
           } 
         }
 
-        // TODO: Continue from here tomorrow
-        let label_obj = {"isNew": isNew, "labels": accessions, "class_labels": classes};
-
         // Build a label and colour map for each class column
         let n_label_dict = [];
         // let n_colour_map = [];
@@ -667,8 +620,6 @@ function plot(data) {
               // Check if the gene is in the label file
               if ("protein_id" in gene.names) {
                 if (gene.names["protein_id"] in accessions) {
-                  let label = accessions[gene.names["protein_id"]][0];
-                  let evalue = accessions[gene.names["protein_id"]][1];
 
                   for (let i = 0; i < class_names.length; i++) {
                     let groupLabel = accessions[gene.names["protein_id"]][2][i*2];
@@ -681,12 +632,8 @@ function plot(data) {
                     if (groupLabel != "" && groupLabel != null && groupLabel != " ") {
                       if (groupLabel in n_label_dict[i]) {
                         n_label_dict[i][groupLabel].push(gene.uid);
-                        // if (n_colour_map[i][groupLabel] == null || n_colour_map[i][groupLabel] == "") {
-                        //   n_colour_map[i][groupLabel] = groupColour;
-                        // }
                       } else {
                         n_label_dict[i][groupLabel] = [gene.uid];
-                        // n_colour_map[i][groupLabel] = groupColour;
                       }
                     }
                   }
@@ -844,8 +791,6 @@ function plot(data) {
           // Homology (group) genes should already be in there
         }
 
-        // n_groups = [];
-
         // Go through the FNs/Colour Maps and build the groups
         for (let i=0; i < n_uid_fn.length; i++) {
           fn = n_uid_fn[i];
@@ -864,7 +809,7 @@ function plot(data) {
             colourMap[groupLabel] = colourMap[groupLabel][0];
 
             newGroup = {
-              "uid": "dynamic-group-" + i + "-" + groupLabel,
+              "uid": "dynamic-group-" + i + "-" + groupLabel.split(": ")[0].trim().replace(" ", "-"),
               "label": groupLabel,
               "genes": fn[groupLabel],
               "hidden": true,
@@ -879,11 +824,8 @@ function plot(data) {
         }
 
         // Assign the labels to the genes
-        let matchDict = label_obj["labels"];
-        let newFlag = label_obj["isNew"];
-
-        // Don't need label_obj for anything else
-        label_obj = null;
+        let matchDict = accessions;
+        let newFlag = isNew
 
         let classDicts = [];
 
@@ -1216,6 +1158,20 @@ function resetBolding() {
 // Add group event listeners to groups on page load
 boldGroupSetUp();
 // document.addEventListener("DOMContentLoaded", boldGroupSetUp);
+
+function setGroupNums() {
+  // Function to set the group.groupNum attribute for each group
+
+  // First uncheck the "Show group number: " checkbox
+  document.getElementById("input-group-label-show").checked = false;
+
+
+  let groupNum = 0;
+  for (let group of data.groups) {
+    // Check if group.groupNum exists
+    
+  }
+}
 
 
 // End
