@@ -121,102 +121,9 @@ for (let c in data.clusters) {
     }
 }
 
-// Getting the frequencies for Group product labeling
-for (g in data.groups) {
-  const group = data.groups[g];
-  let psiFlag = false; // Flag to check if psi_blast_match is present in group
-  let groupProducts = {};
-  let newLabel = group.label + ": ";
-
-  for (geneUid of group.genes) {
-    if (Object.keys(matchGenes).includes(geneUid)) {
-      if (!newLabel.includes(matchGenes[geneUid])) {
-        newLabel += matchGenes[geneUid];
-        psiFlag = true;
-      }
-    }
-    if (geneUidMap[geneUid][0] != "undefined" && geneUidMap[geneUid][0] != null && typeof geneUidMap[geneUid][0] == "string" && geneUidMap[geneUid][0].trim() != "") {
-      groupProducts[geneUidMap[geneUid][0]] == null ? groupProducts[geneUidMap[geneUid][0]] = 1 : groupProducts[geneUidMap[geneUid][0]]++;
-    }
-    // else { alert([geneUidMap[geneUid], geneUid]) }
-  }
-
-
-  let keys = Object.keys(groupProducts);
-  let noUndefined = [];
-  for (key of keys) {
-    if (key != "undefined") { noUndefined.push(key); }
-    else { noUndefined.push("pseudogene"); }
-  }
-  keys = noUndefined;
-  let newProducts = {};
-  for (key of keys) {
-    if (key == "pseudogene") {
-      newProducts[key] = groupProducts["undefined"]
-    }
-    newProducts[key] = groupProducts[key];
-  }
-  groupProducts = newProducts;
-
-  let first, second;
-
-  if (psiFlag) {
-    first = newLabel.slice(newLabel.indexOf(":")+2);
-    second = "";
-    keys = [];
-    for (acr of first.split(",")) {
-      acr != "" ? keys.push(acr) : {};
-      }
-    // data.groups[g].label = newLabel.slice(0, newLabel.length - 1);
-  }
-  else {
-    if (keys.length == 1) {  }
-    else {
-      const lenGroup = group.genes.length;
-      const numKeys = keys.length;
-
-      let sortable = [];
-      for (let key in groupProducts) {
-        sortable.push([key, groupProducts[key]]);
-      }
-
-      sortable.sort(function(a,b) {
-        return a[1] - b[1];
-      });
-
-      keys = sortable.reverse();
-      for (i in keys) {
-        keys[i] = keys[i][0];
-      }
-    }
-
-    if (keys.length > 1) {
-        first = keys[0];
-        second = keys[1];
-    } else if (keys.length > 0) {
-        first = keys[0];
-        second = "";
-    } else {
-        first = "";
-        second = "";
-    }
-
-  }
-
-  if (second != "") {
-    data.groups[g].label = group.label + ":" + " " + first + " | " + second;
-  } else {
-    if (first[first.length - 1] == ",") { first = first.slice(0, first.length-1) }
-    data.groups[g].label = group.label + ":" + " " + first;
-  }
-  data.groups[g].products = keys;
-
-  let gN = group.label.split(" ")[1];
-  if (gN[gN.length-1] == ":") { gN = gN.slice(0, gN.length-1) }
-
-  data.groups[g].groupNum = gN;
-
-}
+// Set the additional group attributes we need for interaction, then display the 2 products
+setGroupAttributes();
+updateGroupProductsDisplay(document.getElementById("input-group-label-length").value);
 
 //-----------------------------------------------------------------------------------------------------------------------
 
@@ -335,9 +242,6 @@ function plot(data) {
         data.groups[i].hidden = true;
       }
 
-      // console.log(data.groups)
-      // console.log(data.classes)
-
       // Wipe data.groups
       data.groups = [];
 
@@ -346,18 +250,15 @@ function plot(data) {
         data.classes[groupIdx].groups[i].hidden = false;
         data.groups.push(data.classes[groupIdx].groups[i]);
       }
+
+      // Set group nums and products
+      setGroupNums();
+      setGroupProducts();
     }
 
-    // if (type != "Default") {
-    //   // Make sure links isn't already empty
-    //   if (data.links.length > 0) {
-    //     data.oldLinks = data.links;
-    //     data.links = [];
-    //   }
-    // } else {
-    //   data.links = data.oldLinks;
-    //   data.oldLinks = [];
-    // }
+    // Get the number of products being displayed
+    let numProducts = document.getElementById("input-group-label-length").value;
+    updateGroupProductsDisplay(numProducts);
 
     plot.call(chart);
     boldGroupSetUp();
@@ -649,13 +550,18 @@ function plot(data) {
         let n_uid_fn = [];
         let n_default_colour_map = [];
         let n_default_labels = [];
+        let n_default_group_order = [];
 
         for (let i=0; i < class_names.length; i++) {
           let uid_fn = {};
           let default_colour_map = {};
           let default_labels = {};
+          let default_group_order = [];
 
           for (group of data.groups) {
+            // Preserve the order of the groups in the label file
+            default_group_order.push(group.label);
+
             // Get the UIDs for each gene in the group
             for (geneUID of group.genes) {
               if (group.label in uid_fn) {
@@ -687,6 +593,7 @@ function plot(data) {
           n_uid_fn.push(uid_fn);
           n_default_colour_map.push(default_colour_map);
           n_default_labels.push(default_labels);
+          n_default_group_order.push(default_group_order);
         }
 
         // Now we have all the data we need to build the new groups (homology extended and non-homologous subclass)
@@ -780,11 +687,15 @@ function plot(data) {
             label = uid_to_labels[uid] + " (dynamic)";
             
             if (label in defaultFN) {
+              // New group already in fn, add the uid to it
               defaultFN[label].push(uid);
             } else {
               // Add label to fn, set colour to black
               defaultFN[label] = [uid];
               colourMap[label] = ["#000000"];
+
+              // Add the label to the order list
+              n_default_group_order[i].push(label);
             }
           }
 
@@ -796,8 +707,23 @@ function plot(data) {
           fn = n_uid_fn[i];
           colourMap = n_default_colour_map[i];
           groups = [];
+          order = n_default_group_order[i];
+          names = n_default_labels[i];
 
-          for (let groupLabel in fn) {
+          for (let groupLabel of order) {
+            let labeledGroup = false; // Flag to disable GroupNum toggling
+
+            if (groupLabel in names) {
+              if (names[groupLabel] != groupLabel) {
+                // Group name updated, set labeledGroup to true
+                labeledGroup = true;
+              }
+              groupLabel = names[groupLabel];
+            } else {
+              // New label group
+              labeledGroup = true;
+            }
+
             if (groupLabel in colourMap && colourMap[groupLabel].length > 1) {
               // If the group label has more than one colour, set it to the first one
               alert("Warning: Group label " + groupLabel + " has multiple colours assigned to it. Using the first one in the label file.");
@@ -809,11 +735,13 @@ function plot(data) {
             colourMap[groupLabel] = colourMap[groupLabel][0];
 
             newGroup = {
-              "uid": "dynamic-group-" + i + "-" + groupLabel.split(": ")[0].trim().replace(" ", "-"),
+              "uid": "dynamic-group" + i + "-" + groupLabel.split(": ")[0].trim().replace(" ", ""),
               "label": groupLabel,
               "genes": fn[groupLabel],
               "hidden": true,
-              "colour": colourMap[groupLabel]
+              "colour": colourMap[groupLabel],
+              "disableNum": labeledGroup,
+              "baseLabel": groupLabel.split(": ")[0].trim()
             }
 
             // Add the group to the groups array
@@ -927,17 +855,21 @@ function plot(data) {
     // Need to check if group.groupNum exists!
     if (d3.select(this).property("checked")) {
       for (let group of data.groups) {
-        if (group.label.includes("Group "+group.groupNum)) {}
-        else {(group.label != "" && group.label != " ")
-        ? group.label = "Group "+group.groupNum+": "+group.label
-        : group.label = "Group "+group.groupNum}
+        if (!group.disableNum) {
+          if (group.label.includes("Group "+group.groupNum)) {}
+          else {(group.label != "" && group.label != " ")
+          ? group.label = "Group "+group.groupNum+": "+group.label
+          : group.label = "Group "+group.groupNum}
+        }
       }
     } else {
       for (let group of data.groups) {
-        if (group.label.includes("Group "+group.groupNum)) {
-          if (group.label.indexOf(": ") != -1) {
-            group.label = group.label.split(": ").slice(1,).join(": ")
-          } else { group.label = "" }
+        if (!group.disableNum) {
+          if (group.label.includes("Group "+group.groupNum)) {
+            if (group.label.indexOf(": ") != -1) {
+              group.label = group.label.split(": ").slice(1,).join(": ")
+            } else { group.label = "" }
+          }
         }
       }
     }
@@ -946,21 +878,7 @@ function plot(data) {
   });
   d3.select("#input-group-label-length")
     .on("change", function() {
-      // Need to check if group.products exists!
-      newLen = this.value
-      for (let group of data.groups) {
-        let newArr = []
-        for (let i = 0; (i < newLen && i < group.products.length); i++) {
-          newArr.push(group.products[i])
-        }
-        //alert([newArr, newLen, group.products.length])
-        if (d3.select("#input-group-label-show").property("checked")) {
-          group.label = "Group "+group.groupNum+": "+newArr.join(" | ");
-        } else {
-          group.label = newArr.join(" | ");
-        }
-        if (group.label[group.label.length -2] == ":") { group.label = group.label.slice(0, group.label.length-2)}
-      }
+      updateGroupProductsDisplay(this.value);
 
       plot.call(chart);
     });
@@ -1029,6 +947,10 @@ function plot(data) {
     document.getElementById(anchorGeneUid).getElementsByTagName("polygon")[0].dispatchEvent(clickEvent);
   }
 
+  setGroupAttributes();
+  boldGroupSetUp();
+  updateGroupProductsDisplay(2);
+
   // End of custom block
   //---------------------------------------------------------------------------------------------------------------------
 }
@@ -1088,7 +1010,10 @@ function boldGroup(g) {
   // Function to bold-ify the borders of genes within a group
   g.style.fontWeight = 'bold';
   let gUid = g.getElementsByTagName("circle")[0].getAttribute("class");
+  // For some reason, circle class isn't the same as the polygon class
+  //   e.g., "group-dynamic-group0-Group-0" vs "group-dynamic-group0-Group0"
   for (e of document.getElementsByClassName(gUid)) {
+    // alert(e.tagName);
     if (e.tagName == "polygon") {
       e.setAttribute("style", "stroke: black; stroke-width: 5")
     }
@@ -1108,6 +1033,16 @@ function unboldGroup(g) {
 
 function checkBold(g) {
   // Function to check if a group is bold-ified
+  // If any of the genes in the group are bolded, return true
+  // If the group name itself is bolded, return true
+  let gUid = g.getElementsByTagName("circle")[0].getAttribute("class");
+  for (e of document.getElementsByClassName(gUid)) {
+    if (e.tagName == "polygon") {
+      if (e.getAttribute("style").includes("stroke-width: 5")) {
+        return true;
+      }
+    }
+  }
   return g.style.fontWeight == 'bold';
 }
 
@@ -1156,21 +1091,117 @@ function resetBolding() {
 }
 
 // Add group event listeners to groups on page load
-boldGroupSetUp();
+// boldGroupSetUp();
 // document.addEventListener("DOMContentLoaded", boldGroupSetUp);
 
-function setGroupNums() {
-  // Function to set the group.groupNum attribute for each group
-
-  // First uncheck the "Show group number: " checkbox
-  document.getElementById("input-group-label-show").checked = false;
-
-
+function setGroupNums(groups=data.groups) {
+  // Function to set the group.groupNum attribute for each group (just use the index of the group in the array)
   let groupNum = 0;
-  for (let group of data.groups) {
+  for (let group of groups) {
     // Check if group.groupNum exists
-    
+    if (!group.disableNum) {
+      group.groupNum = groupNum;
+    }
+    groupNum++;
   }
+}
+
+function setGroupProducts(groups=data.groups) {
+  // Function to populate the group.products attribute for each group
+  for (let group of groups) {
+    let productFreqs = {};
+    for (let geneUID of group.genes) {
+      // Need to get the actual gene object from the data.clusters array
+      for (let cluster of data.clusters) {
+        for (let locus of cluster.loci) {
+          for (let gene of locus.genes) {
+            if (gene.uid == geneUID && "product" in gene.names) {
+              let product = gene.names["product"];
+
+              let disallowedProducts = ["hypothetical protein", "uncharacterized protein"]
+
+              if (!(product.toLowerCase() in disallowedProducts) && product.trim() != "") {
+                if (product in productFreqs) {
+                  productFreqs[product]++;
+                } else {
+                  productFreqs[product] = 1;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    let sortedProducts = Object.entries(productFreqs).sort((a, b) => b[1] - a[1]);
+    let productList = [];
+    for (let i = 0; i < sortedProducts.length; i++) {
+      productList.push(sortedProducts[i][0]);
+    }
+    group.products = productList;
+  }
+}
+
+function updateGroupProductsDisplay(n) {
+  newLen = n;
+
+  for (let group of data.groups) {
+    // Check if group.products exists
+    if (!group.products) {
+      group.products = [];
+    }
+
+    let newArr = []
+    for (let i = 0; (i < newLen && i < group.products.length); i++) {
+      newArr.push(group.products[i])
+    }
+    //alert([newArr, newLen, group.products.length])
+    if (d3.select("#input-group-label-show").property("checked")) {
+      group.label = group.baseLabel + ": "+newArr.join(" | ");
+    } else {
+      if (!group.disableNum) {
+        group.label = newArr.join(" | ");
+      } else {
+        // If it's a label group, add the products to the baseLabel
+        group.label = group.baseLabel + ": " + newArr.join(" | ");
+      }
+    }
+    if (group.label[group.label.length -2] == ":") { group.label = group.label.slice(0, group.label.length-2)}
+  }
+}
+
+function setGroupAttributes() {
+  // Function to add the new group attributes to each group
+  if (data.classes !== undefined) {
+    for (let tier of data.classes) {
+      setGroupProducts(tier.groups);
+      for (let group of tier.groups) {
+        let baseLabel = group.label.split(": ")[0].trim();
+        group.baseLabel = baseLabel;
+
+        if (baseLabel.includes("Group ")) {
+          group.disableNum = false;
+        } else {
+          group.disableNum = true;
+        }
+      }
+      setGroupNums(tier.groups);
+    }
+  }
+
+
+  setGroupProducts(data.groups);
+  for (let group of data.groups) {
+    let baseLabel = group.label.split(": ")[0].trim();
+    group.baseLabel = baseLabel;
+
+    if (baseLabel.includes("Group ")) {
+      group.disableNum = false;
+    } else {
+      group.disableNum = true;
+    }
+  }
+  setGroupNums(data.groups);
 }
 
 
