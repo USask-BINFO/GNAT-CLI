@@ -35,6 +35,10 @@ if args.parsed:
         raise FileNotFoundError(f"Parsed PSI-BLAST output file {args.parsed} does not exist.")
     
     # Read the parsed PSI-BLAST output file
+    if label_file.header is None:
+        # Add a default header
+        label_file.header = "Accession,Label,E_Value"
+
     with open(args.parsed, "r") as f:
         for line in f:
             # Parsed PSI-BLAST file format: GCA    Accession    E_Value    Label    .... Rest not important
