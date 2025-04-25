@@ -7,6 +7,9 @@ class LabelFile:
     A wrapper to interact with a SortedList storing LabelRecord objects.
     This class provides methods to add, remove, and find records in the list.
     It also provides methods to bulk extract records and to merge two label files.
+
+    The output file will be sorted by the accessions (first column), even if the 
+    input file is not sorted.
     """
 
     def __init__(self, filename=None, max_file_size=2 * 1024 ** 3, ):
