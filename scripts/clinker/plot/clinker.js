@@ -651,10 +651,10 @@ function plot(data) {
 
             if (names[group] == group) {
               // Group name hasn't been updated, overwrite it
-              names[group] = label + " (dynamic homologous)";
+              names[group] = label + " (Dynamic Homologous " + group.split(": ")[0] + ")";
             } else {
               // Group name has been updated, check if it has the label already
-              if (!(names[group].includes(label + " (dynamic homologous)") || names[group].includes(label + " | "))) {
+              if (!(names[group].includes(label + " (Dynamic Homologous ") || names[group].includes(label + " | "))) {
                 // Group name has been updated with a different label, add this one to it
                 names[group] = label + " | " + names[group];
               }
@@ -684,7 +684,7 @@ function plot(data) {
 
           // Add the rest of the label genes to the fn
           for (uid of labelRest) {
-            label = uid_to_labels[uid] + " (dynamic)";
+            label = uid_to_labels[uid] + " (Dynamic)";
             
             if (label in defaultFN) {
               // New group already in fn, add the uid to it

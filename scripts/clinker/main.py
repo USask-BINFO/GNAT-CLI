@@ -263,10 +263,12 @@ def clinker(
             n_fn = []
             n_colour_map = []
             n_new_labels = []
+            n_default_ordering = []
             for _ in range((len(label_obj.header.split(',')) - 3) // 2):
                 default_fn = {}
                 default_colours = {}
                 default_labels = {}
+                default_order = []
                 for i in range(len(default_groups)):
                     group = default_groups[i]
                     # Get the gene accessions for the group (From the UIDs)
@@ -280,17 +282,23 @@ def clinker(
                             gene_acc = gene_uid # Make sure this works TODO
                         default_fn[group.label].append(gene_acc)
                     # default_fn[group.label] = group.genes
+                    print(f"Group {group.label} has the following attributes (and values): {group.__dict__}")
                     default_colours[group.label] = [group.colour]
                     default_labels[group.label] = group.label
+                    default_order.append(group.label)
+            
                 n_fn.append(default_fn)
-                n_colour_map.append(default_colours)
+                n_colour_map.append(default_colours) # Looks like all of these colours are [None], since the groups haven't been built yet?
                 n_new_labels.append(default_labels)
+                n_default_ordering.append(default_order)
 
             # Now we have all the data we need to build the new groups (homology extended and non-homologous subclass)
-            # 1 - If a gene from the label file is in a homology group, re-name the homology group to the label (e.g., Group 3 --> "Abi2 (homology)")
-            # 2 - If another gene with a different label from the label file is in the same homology group, prepend it to the label (e.g., Abi2 (homology) --> Abi3 | Abi2 (homology))
+            # 1 - If a gene from the label file is in a homology group, re-name the homology group to the label (e.g., Group 3 --> "Abi2 (Homology Group 3)")
+            # 2 - If another gene with a different label from the label file is in the same homology group, prepend it to the label (e.g., Abi2 (Homology Group 3) --> Abi3 | Abi2 (Homology Group 3))
             # 3 - If a gene from the label file isn't in a homology group, create a new group for it in the fn and colour it black
             #   - If the label is already in the fn, add the gene to it (e.g., if 3 already happened)
+            # 4 - If genes from the label file share the same label, but are in different homology groups, keep them separate (e.g., Abi2 (Homology Group 3) and Abi2 (Homology Group 4))
+            # 5 - Likewise, if two genes from the label file share the same label, but are in different homology groups, and one of the homology groups has another gene with a different label, keep them separate and only prepend the label for the latter one (e.g., Abi2 (Homology Group 3) and Abi3 (Homology Group 4) --> Abi2 | Abi3 (Homology Group 4))
 
             keys = list(n_fn[0].keys())
             for i in range(len(n_label_dict)):
@@ -324,12 +332,16 @@ def clinker(
 
                     if names[group] == group:
                         # Group name hasn't been updated, overwrite it
-                        names[group] = f"{label} (homologous)"
+                        names[group] = f"{label} (Homologous {group})"
+                        n_default_ordering[i][n_default_ordering[i].index(group)] = names[group]
                     else:
                         # Group name has already been updated, check if it has the label already
-                        if f"{label} (homologous)" not in names[group] and f"{label} | " not in names[group]:
+                        if f"{label} (Homologous " not in names[group] and f"{label} | " not in names[group]:
                             # Group name has been updated with a different label, add this one to it
+                            idx = n_default_ordering[i].index(names[group])
                             names[group] = f"{label} | " + names[group]
+                            n_default_ordering[i][idx] = names[group]
+
                 
                 remove = [] # List of entries to remove from fn (renamed)
                 # Now we need to update the fn and colour map with the new labels
@@ -362,22 +374,52 @@ def clinker(
                         # Add the colour to the colour map (black)
                         colour_map[label] = ["#000000"]
 
+                        # Add the label to the order list
+                        n_default_ordering[i].append(label)
+
                 # Homology genes should already all be in there
                 
-            # Go through the fns/colour_maps and build the groups
+            # Go through the fns/colour_maps and build the groups (in default order)
             for i in range(len(n_fn)):
                 fn = n_fn[i]
                 colour_map = n_colour_map[i]
+                default_order = n_default_ordering[i]
+                labeled_groups = []
+                names = n_new_labels[i]
 
-                for group_name in fn:
-                    if len(colour_map[group_name]) > 1:
+                for j in range(len(default_order)):
+                    label = default_order[j]
+                    labeled_group = False
+
+                    if label in names:
+                        if names[label] != label:
+                            # Group name updated, set labeledGroup to true
+                            labeled_group = True
+
+                        label = names[label]
+                    else:
+                        # New group
+                        labeled_group = True
+
+                    labeled_groups.append(labeled_group)
+
+                    default_order[j] = label
+
+                    group_name = label
+
+                    if colour_map[group_name] and len(colour_map[group_name]) > 1:
                         LOG.warning(f"Label {group_name} has more than one colour assigned: {colour_map[group_name]}. Using first one.")
+
+                    if not colour_map[group_name]:
+                        # New group, pass (it's black)
+                        colour_map[group_name] = ["#000000"]
+
                     colour_map[group_name] = colour_map[group_name][0]
 
                 # Get the class name from the header
                 class_name = label_obj.header.split(",")[i * 2 + 3]
 
-                new_group = globaligner.build_gene_groups_return(functions=fn, colour_map=colour_map, use_links=False, level=i+1)
+                new_group = globaligner.build_gene_groups_return(functions=fn, colour_map=colour_map, use_links=False, level=i+1, order=default_order, labeled_groups=labeled_groups)
                 globaligner.classes.append({"name": class_name, "groups": new_group})
 
     if globaligner.alignments:
