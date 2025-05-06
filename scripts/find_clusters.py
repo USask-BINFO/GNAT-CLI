@@ -332,7 +332,7 @@ def main():
                                                                            "(default 10)")
     parser.add_argument("--min_thresh", type=int, default=5, help="Lowest number of GNs per cluster (default 5).")
     parser.add_argument("--max_thresh", type=int, default=15, help="Highest number of GNs per cluster (default 15).")
-    parser.add_argument("--max_genes", type=int, default=41, help="Maximum number of genes that can be in a GN (default 41). This doesn't affect the generation of GNs, it just tells the program how genes to expect in each.")
+    parser.add_argument("--max_genes", type=int, default=41, help="Maximum number of genes that can be in a GN (default 41). This doesn't affect the generation of GNs, it just tells the program how many genes to expect in each.")
 
     args = parser.parse_args()
 
@@ -383,7 +383,7 @@ def main():
         
         for gn in names:
             # This is used to help calculate the 'average' orientations
-            orientations = {'before': [], 'match': [], 'after': []}
+            orientations = {'before': [], 'match': [], 'after': [], 'match_idx': None, 'match_strand': None}
             current_block = []
             query_block_flag = -1 # < 0 before match block, 0 at match block, > 0 after match block
             
@@ -481,6 +481,9 @@ def main():
             match = all_orientations[i]["match"]
             after = all_orientations[i]["after"]
             
+            if all_orientations[i]["match_idx"] is None:
+                continue
+
             match = [1 for _ in range(len(match[0]))]
             match[all_orientations[i]["match_idx"]] = 0
 

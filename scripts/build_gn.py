@@ -71,12 +71,12 @@ def get_feature_index(record, accession):
             return i
     return -1
 
-def get_flanks(record, split_index):
+def get_flanks(record, split_index, debug=False):
     """
     Split a record feature list into 3 sublists around the specified index: [before][index][after]
     :param record: GenBank record containing the features to separate
     :param split_index: The index to split flanks off from, usually the match index.
-    :return: [list, of, features, before, idx], [idx], [features, after, idx]
+    :return: [list, of, features, before, idx], idx, [features, after, idx]
     """
     features = [feature for feature in record.features if feature.type == "CDS"]
 
@@ -152,7 +152,7 @@ def does_feature_wrap_origin(feature, original_record):
 
     # Get the start and end positions of the feature
     start, end = feature.location.start, feature.location.end
-    print(start, end)
+    # print(start, end)
 
     if start == 0 and end == genome_length:
         return True
@@ -175,17 +175,72 @@ def build_gn_from_features(original_record, feature_list, match_accession):
         raise ValueError("No features to build Genomic Neighbourhood from.")
     
     # Get start and end positions of the new record
-    start, end = feature_list[0].location.start, feature_list[-1].location.end
+    original_start, original_end = feature_list[0].location.start, feature_list[-1].location.end
 
-    # No longer using this loop so that the GN cuts off at the start/end of the first/last gene (respectively). It will still include genes fully overlapped by the edge gene, but avoids the rare edge case where a gene within the GN consists of two exons super far apart and results in a GN that is bascially the entire genome.
-    # Loop to ensure there aren't overlapping genes that go further than the first/last in the list
-    for feature in feature_list:
+    start, end = original_start, original_end
+
+    # No longer using this loop so that the GN cuts off at the start/end of the first/last gene (respectively). It will still include genes fully overlapped by the edge gene, but avoids the rare edge case where a gene within the GN consists of two exons super far apart and results in a GN that is bascially the entire genome. DISREGARD
+    # Loop to ensure there aren't overlapping genes that go further than the first/last in the list, also get the match feature
+    match_feature = None
+    match_feature_index = None
+    for i, feature in enumerate(feature_list):
+        if 'protein_id' in feature.qualifiers and feature.qualifiers['protein_id'][0] == match_accession:
+            if match_feature is None:
+                match_feature = feature
+                match_feature_index = i
+            else:
+                print(f"Warning: Record for match accession: {match_accession} has multiple proteins with the match accession! Using the first occurrence as the match feature.")
+
         if feature.location.start < start:
             start = feature.location.start
         if feature.location.end > end:
             end = feature.location.end
 
     new_record = original_record[start:end]
+
+    # Check if the match gene wraps over the origin (tough edge case)
+    if does_feature_wrap_origin(match_feature, new_record):
+        # If the match gene wraps the origin, it's either the first or last gene in the list
+        # Check if the match gene is the first gene in the list
+        # Get the feature index of the match gene in the new record
+        match_feature_index = get_feature_index(new_record, match_accession)
+
+        if match_feature_index == 0:
+            # If the match gene is the first gene in the list, trim the .join element of the gene to cut off the end of the genome
+
+            new_location = match_feature.location
+
+            for part in match_feature.location.parts:
+                if start in [part.start, part.end]:
+                    new_location = part
+                    break
+
+            # Set the new location to the new record
+            match_feature.location = new_location
+
+            new_record.features[match_feature_index] = match_feature
+
+        elif match_feature_index == len(feature_list) - 1:  
+            # If the match gene is the last gene in the list, trim the .join element of the gene to cut off the start of the genome
+
+            new_location = match_feature.location
+
+            for part in match_feature.location.parts:
+                if end in [part.start, part.end]:
+                    new_location = part
+                    break
+
+            # Set the new location to the new record
+            match_feature.location = new_location
+
+            new_record.features[match_feature_index] = match_feature
+
+        else:
+            # If the match gene is not the first or last gene in the list, do nothing (because it shouldn't be overlapping...)
+            print(f"========================================================================================================================================")
+            print(f"ALERT: Match gene {match_accession} wraps the origin of the genome, but is not the first or last gene in the list. This is unexpected behavior and should be investigated.")
+            print(f"========================================================================================================================================")
+
 
     # Check the number of features in the new GN
     if get_num_features(new_record) > (len(feature_list) + 6):
@@ -207,13 +262,20 @@ def build_gn_from_features(original_record, feature_list, match_accession):
             after = trim_flank(after, edge_gene_after, 1)
 
         # Check the first and last gene features, if either of them overlap to the other end of the genome, remove them
-        first_gene = before[0]
-        last_gene = after[-1]
+        if len(before) > 0:
+            first_gene = before[0]
+        else:
+            first_gene = match
 
-        if does_feature_wrap_origin(first_gene, original_record):
+        if len(after) > 0:
+            last_gene = after[-1]
+        else:
+            last_gene = match
+
+        if does_feature_wrap_origin(first_gene, original_record) and len(before) > 0:
             before = before[1:]
 
-        if does_feature_wrap_origin(last_gene, original_record):
+        if does_feature_wrap_origin(last_gene, original_record) and len(after) > 0:
             after = after[:-2]
 
         # Combine the flanks and match gene
