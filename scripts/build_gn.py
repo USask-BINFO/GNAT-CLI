@@ -203,7 +203,12 @@ def build_gn_from_features(original_record, feature_list, match_accession):
         # If the match gene wraps the origin, it's either the first or last gene in the list
         # Check if the match gene is the first gene in the list
         # Get the feature index of the match gene in the new record
-        match_feature_index = get_feature_index(new_record, match_accession)
+        # new_match_feature_index = get_feature_index(new_record, match_accession)
+
+        # if new_match_feature_index != match_feature_index:
+        #     print(f"ALERT: Match gene {match_accession} is not the same index in the new record as it was in the original record. This is unexpected behavior and should be investigated. Before: {match_feature_index}, After: {new_match_feature_index}")
+        #     print(f"Old feature list: {feature_list[match_feature_index]}")
+        #     print(f"New feature list: {new_record.features[match_feature_index]}\n{new_record.features[new_match_feature_index]}")
 
         if match_feature_index == 0:
             # If the match gene is the first gene in the list, trim the .join element of the gene to cut off the end of the genome
@@ -216,9 +221,11 @@ def build_gn_from_features(original_record, feature_list, match_accession):
                     break
 
             # Set the new location to the new record
-            match_feature.location = new_location
+            # match_feature.location = new_location
 
-            new_record.features[match_feature_index] = match_feature
+            feature_list[0].location = new_location
+
+            # new_record.features[match_feature_index] = match_feature
 
         elif match_feature_index == len(feature_list) - 1:  
             # If the match gene is the last gene in the list, trim the .join element of the gene to cut off the start of the genome
@@ -231,15 +238,38 @@ def build_gn_from_features(original_record, feature_list, match_accession):
                     break
 
             # Set the new location to the new record
-            match_feature.location = new_location
+            # match_feature.location = new_location
 
-            new_record.features[match_feature_index] = match_feature
+            feature_list[-1].location = new_location
+
+            # new_record.features[match_feature_index] = match_feature
 
         else:
             # If the match gene is not the first or last gene in the list, do nothing (because it shouldn't be overlapping...)
             print(f"========================================================================================================================================")
             print(f"ALERT: Match gene {match_accession} wraps the origin of the genome, but is not the first or last gene in the list. This is unexpected behavior and should be investigated.")
             print(f"========================================================================================================================================")
+
+        start, end = original_start, original_end
+
+        # No longer using this loop so that the GN cuts off at the start/end of the first/last gene (respectively). It will still include genes fully overlapped by the edge gene, but avoids the rare edge case where a gene within the GN consists of two exons super far apart and results in a GN that is bascially the entire genome. DISREGARD
+        # Loop to ensure there aren't overlapping genes that go further than the first/last in the list, also get the match feature
+        match_feature = None
+        match_feature_index = None
+        for i, feature in enumerate(feature_list):
+            if 'protein_id' in feature.qualifiers and feature.qualifiers['protein_id'][0] == match_accession:
+                if match_feature is None:
+                    match_feature = feature
+                    match_feature_index = i
+                else:
+                    print(f"Warning: Record for match accession: {match_accession} has multiple proteins with the match accession! Using the first occurrence as the match feature.")
+
+            if feature.location.start < start:
+                start = feature.location.start
+            if feature.location.end > end:
+                end = feature.location.end
+
+        new_record = original_record[start:end]
 
 
     # Check the number of features in the new GN
