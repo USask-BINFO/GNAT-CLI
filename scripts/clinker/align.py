@@ -556,7 +556,7 @@ class Globaligner(Serializer):
         for group in self.groups:
             group.genes = list(group.genes)
 
-    def build_gene_groups_return(self, functions: Optional[Dict[str, List[str]]]=None, colour_map=defaultdict(None), use_links=False, level=0, hidden=True) -> List[Dict]:
+    def build_gene_groups_return(self, functions: Optional[Dict[str, List[str]]]=None, colour_map=defaultdict(None), use_links=False, level=0, hidden=True, order=[], labeled_groups=[]) -> List[Dict]:
         """Builds gene groups based on functions and stored gene-gene links (optional).
         
         `functions` maps genes to user-assigned functions; keys should correspond
@@ -574,6 +574,12 @@ class Globaligner(Serializer):
 
         `hidden` specifies whether the new groups should be hidden by default. Default True.
 
+        `order` contains a list of labels (functions' keys) in the order they should be displayed.
+
+        `labeled_groups` contains a list of booleans indicating whether the corresponding 
+            group contains a gene from the label file. If the length of this list is unequal to 
+            the length of the order list, all items in labeled_groups will be set to False.
+
         e.g., If genes A and B are both assigned as category Z, and have links to
             genes C and D, respectively, the result will be a single group Z,
             containing genes A, B, C and D. Group Z is first made with genes A and B,
@@ -585,10 +591,28 @@ class Globaligner(Serializer):
         """
         groups = []
         if functions:
-            for function, genes in functions.items():
+            if len(order) > 0:
+                order = order
+            else:
+                order = list(functions.keys())
+            
+            if len(labeled_groups) != len(order):
+                print("Warning: The number of items in labeled_groups does not match the number of items in order. Setting all items in labeled_groups to False.")
+                labeled_groups = [False] * len(order)
+
+            for i in range(len(order)):
+                labeled = labeled_groups[i]
+                label = order[i]
+
+                genes = functions[label]
                 uids = self.get_gene_uids(genes)
-                group = Group(label=function, genes=set(uids), level=level, hidden=hidden, colour=colour_map[function])
-                groups.append(group)
+
+                group = Group(label=label, genes=set(uids), level=level, hidden=hidden, colour=colour_map[label], labeled=labeled)
+                groups.append(group)                
+            # for function, genes in functions.items():
+            #     uids = self.get_gene_uids(genes)
+            #     group = Group(label=function, genes=set(uids), level=level, hidden=hidden, colour=colour_map[function])
+            #     groups.append(group)
         if use_links:
             if not self._links:
                 for group in groups:
@@ -861,13 +885,14 @@ class Link(Serializer):
 class Group(Serializer):
     """A gene homology group."""
 
-    def __init__(self, uid=None, label=None, genes=None, hidden=False, colour=None, level=None):
+    def __init__(self, uid=None, label=None, genes=None, hidden=False, colour=None, level=None, labeled=False):
         self.uid = uid if uid else str(uuid.uuid4())
         self.label = label if label else f"Group {self.uid}"
         self.genes = genes if genes else []
         self.hidden = hidden
         self.colour = colour
         self.level = level # Level of the group (e.g., 0 for default PID groups, 1 for class 1 in new label file, 2 for class 2, and so on)
+        self.labeled = labeled  # Whether the group contains genes from the label file
 
     def to_dict(self):
         return {
@@ -877,6 +902,7 @@ class Group(Serializer):
             "hidden": self.hidden,
             "colour": self.colour,
             "level": self.level,
+            "labeled": self.labeled
         }
 
     @classmethod
@@ -888,5 +914,6 @@ class Group(Serializer):
             hidden=d.get("hidden"),
             colour=d.get("colour"),
             level=d.get("level"),
+            labeled=d.get("labeled")
         )
 
