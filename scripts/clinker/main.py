@@ -282,7 +282,7 @@ def clinker(
                             gene_acc = gene_uid # Make sure this works TODO
                         default_fn[group.label].append(gene_acc)
                     # default_fn[group.label] = group.genes
-                    print(f"Group {group.label} has the following attributes (and values): {group.__dict__}")
+                    # print(f"Group {group.label} has the following attributes (and values): {group.__dict__}")
                     default_colours[group.label] = [group.colour]
                     default_labels[group.label] = group.label
                     default_order.append(group.label)
