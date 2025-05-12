@@ -26,7 +26,7 @@ if not path.exists(args.label_file):
 label_file = LabelFile(args.label_file)
 
 # Verify either parsed or modify file was provided
-if not args.parsed and not args.modify and not args.merge_label_file:
+if not args.parsed and not args.merge_label_file:
     raise ValueError("Either a parsed PSI-BLAST output file or a modify file must be provided.")
 
 # Update label object based on parsed PSI-BLAST output file
@@ -37,7 +37,7 @@ if args.parsed:
     # Read the parsed PSI-BLAST output file
     if label_file.header is None:
         # Add a default header
-        label_file.header = "Accession,Label,E_Value"
+        label_file.header = "#Accession,Label,E_Value"
 
     with open(args.parsed, "r") as f:
         for line in f:
@@ -57,12 +57,79 @@ if args.merge_label_file:
     if not path.exists(args.merge_label_file):
         raise FileNotFoundError(f"Merge label file {args.merge_label_file} does not exist.")
     
+    lf_header = label_file.header
+
+    with open(args.merge_label_file, "r") as f:
+        mf_header = f.readline().strip()
+
+    # Split headers into lists
+    lf_parts = lf_header.split(',')
+    mf_parts = mf_header.split(',')
+
+    # Get class names from headers
+    def get_class_names(header_parts):
+        return [header_parts[i] for i in range(3, len(header_parts)) if i % 2 == 1]
+
+    lf_class_names = get_class_names(lf_parts)
+    mf_class_names = get_class_names(mf_parts)
+
+    # Create index lookup from class name to index in each header
+    def build_class_index(header_parts, class_names):
+        return {name: header_parts.index(name) for name in class_names}
+
+    lf_names_to_idx = build_class_index(lf_parts, lf_class_names)
+    mf_names_to_idx = build_class_index(mf_parts, mf_class_names)
+
+    # Add any classes from mf not in lf to the end of lf
+    for mf_name in mf_class_names:
+        if mf_name not in lf_class_names:
+            lf_parts += [mf_name, f"{mf_name}_Colour"]
+            lf_class_names.append(mf_name)
+
+    # Rebuild index lookup for the extended lf header
+    lf_names_to_idx = build_class_index(lf_parts, lf_class_names)
+    # Build mf_new_line_indices: map each item in the final lf header to its index in mf, or None
+    mf_new_line_indices = []
+    for i, name in enumerate(lf_parts):
+        if name in mf_parts:
+            mf_new_line_indices.append(mf_parts.index(name))
+        else:
+            mf_new_line_indices.append(None)
+
+    # Join lf_parts back into a header string
+    lf_header = ','.join(lf_parts)
+
     # Get the number of classes in the original label file
-    label_header_len = len(label_file.header.split(','))
+    old_len = len(label_file.header.split(','))
+
+    # Re-assign the lf header
+    label_file.header = lf_header
+
+    new_len = len(label_file.header.split(','))
+
+    # Pad the label file with empty columns for the new classes
+    print(f"Padding label file with {new_len - old_len} empty columns.")
+    if new_len > old_len:
+        extra_cols = new_len - old_len
+        for record in label_file:
+            record.rest += ',' + ','.join([''] * extra_cols)
+
+    print("Extended lf_header:", lf_header)
+    print("mf_new_line_indices:", mf_new_line_indices)
 
     # Read the merge label file
+    print(f"Adding new lines to label file from {args.merge_label_file}.")
+    added = 0
     with open(args.merge_label_file, "r") as f:
+        # Read the header line
+        header_skipped = False
         for line in f:
+            if not header_skipped:
+                header_skipped = True
+                continue
+
+            line = line.strip()
+
             if len(line.split(',')) < 3:
                 if len(line.split()) < 3:
                     raise ValueError(f"Merge label file {args.merge_label_file} does not have valid delimeters.")
@@ -71,12 +138,38 @@ if args.merge_label_file:
             else:
                 delim = ','
 
-            accession, label, eval = line.split(delim)[:3]
+            if delim is None:
+                # If the line does not have a delimiter, try to split by whitespace
+                split_line = line.split()
+            else:
+                split_line = line.split(delim)
 
-            # Get the label file delimiter
-            delim = label_file.delim
-            line = f"{accession}{delim}{label}{delim}{eval}" + delim * (label_header_len - 3)
-            label_file.add_line(line)
+            # Reformat the line to match the new lf header
+            # Get the accession, label, and eval from the line
+            new_line = []
+            for i in mf_new_line_indices:
+                if i is not None:
+                    new_line.append(split_line[i])
+                else:
+                    new_line.append('')
+
+            new_line = ','.join(new_line)
+            # Add the new line to the label file
+            label_file.add_line(new_line)
+
+            added += 1
+
+    print(f"Added {added} new lines to label file.")
+
+
+
+# OLD
+# accession, label, eval = line.split(delim)[:3]
+
+# # Get the label file delimiter
+# delim = label_file.delim
+# line = f"{accession}{delim}{label}{delim}{eval}" + delim * (label_header_len - 3)
+# label_file.add_line(line)
 
 # Write updated label object to output file or stdout
 # if args.modify:
