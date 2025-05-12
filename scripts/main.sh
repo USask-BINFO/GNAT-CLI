@@ -26,7 +26,7 @@ pid_threshold=30
 length_threshold=20
 out_location=$(pwd)
 out_tag=$(date +%j%M%H%S)
-tax_flag=false
+index_file=''
 
 # Default loading filename (overwritten when called by GNAT with -gl)
 log_filename="log.txt"
@@ -76,6 +76,12 @@ while [[ $# -gt 0 ]]; do
       echo '  [-lf][--label_file_location]    Location of label match file containing query names, protein match accessions,'
       echo '                                   and e-values of the matches. Generated/updated by parse_psiblast_out.py. If'
       echo '                                   not specified, creates a new label file in out folder.'
+      echo '  [-if][--index_file_location]    Location of label index file used to efficiently find matches in large label files.'
+      echo '                                   This label file is separate from the [-lf][--label_file_location] file. The file '
+      echo '                                   provided here is found on the GNAT server and was generated for the large master '
+      echo '                                   label files (extension .idx). This will be used in conjunction with the .accessions'
+      echo '                                   file and the provided/generated label file to add relevant labels to the output label'
+      echo '                                   file.'
       echo '  [-n][--num_flanking_genes]      Number of genes to include upstream/downstream of match gene. Default=15'
       echo '  [-ol][--out_location]           Location to create output directory in. Defaults to the current directory'
       echo '  [-ot][--out_tag]                Descriptor in output directory name. Defaults to a string of 9 numbers. The '
@@ -83,10 +89,6 @@ while [[ $# -gt 0 ]]; do
       echo '  [-pid][--pid_threshold]         PID threshold for match filtering. Filters out match genomic neighbourhoods'
       echo '                                    that are less than pid_threshold identical. The default value is intended'
       echo '                                    to filter matches as homologous or potentially homologous. Default=30'
-      echo '  [-tf][--tax_flag]               Only use this flag if the database being queried is the ncbi bacterial '
-      echo '                                    database. If specified, will try to generate phylogenetic trees and pie '
-      echo '                                    charts, which may crash the program if any other dataset is used. Outputs '
-      echo '                                    a csv file containing the taxonomic data of matches in both cases.'
       exit 0
       ;;
     -e|--evalue)
@@ -109,6 +111,11 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
+    -if|--index_file_location)
+      index_file="$2"
+      shift
+      shift
+      ;;
     -pid|--pid_threshold)
       pid_threshold="$2"
       shift
@@ -127,10 +134,6 @@ while [[ $# -gt 0 ]]; do
     -ol|--out_location)
       out_location="$2"
       shift
-      shift
-      ;;
-    -tf|--tax_flag)
-      tax_flag=true
       shift
       ;;
     -ot|--out_tag)
@@ -236,6 +239,39 @@ echo "[ $out_tag ] BlastDB found!"
 gbff=$(cd "$database_root"/"$org_name"_genomes/gbff || exit; pwd; cd "$curr_dir" || exit)
 echo "[ $out_tag ] GBFFs found!"
 
+# Check if an index file was provided, if so, verify it (and its corresponding label file) exist
+if [ ! -z "${index_file+x}" ] && [ -n "$index_file" ]; then
+  # Get the absolute path to the index file
+  # Make sure we're in the starting directory
+  cd "$curr_dir" || exit 1
+  cd "$(dirname "$index_file")" || exit 1
+  index_file="$(pwd)"/"$(basename "$index_file")"
+  index_label_file="${index_file%.idx}"
+
+  # Verify they exist
+  if [ ! -f "$index_file" ]; then
+    if [ ! -f "$index_label_file" ]; then
+      echo "[ $out_tag ] Warning: Index file $index_file and label file $index_label_file do not exist. Not using an index file."
+      index_file=""
+      index_label_file=""
+    else
+      echo "[ $out_tag ] Warning: Index file $index_file does not exist. Not using an index file."
+      index_file=""
+      index_label_file=""
+    fi
+  else
+    if [ ! -f "$index_label_file" ]; then
+      echo "[ $out_tag ] Warning: Index label file $index_label_file does not exist. Not using an index file."
+
+      index_file=""
+      index_label_file=""
+    fi
+  fi
+
+  # cd back to the original directory
+  cd "$curr_dir" || exit 1
+fi
+
 # Run scripts
 cd "$outdir" || exit 1
 
@@ -334,6 +370,7 @@ do
   file_matches=$(cat "$file" | wc -l)
   (( num_matches += file_matches ))
 
+  # Add parsed PSI-BLAST matches to the label file
   "${script_dir}"modify_label_file.py "$label_file_location" -p "$file"
 
   # Create a subdirectory for each parsed output file if it had matches
@@ -342,7 +379,7 @@ do
     mkdir "${filename%.parsed}"
     mv "$file" "${filename%.parsed}"/
 
-    # Generate genomic neighbourhoods for each file containing matches
+    # Generate genomic neighbourhoods for each file containing matches (and the .accessions files)
     echo "Creating GNs for $file" >> "$logfile"
     echo "[ $out_tag ] Creating GNs for $file"
     "${script_dir}"build_gn.py "${filename%.parsed}"/"$file" -d "$gbff" -o "${filename%.parsed}"/ -n "$num_flanking_genes"
@@ -377,10 +414,35 @@ do
   # Get names of .gb files left in current directory
   gb_files=("$dir"/*.gb)
 
-  # Generate phylo data for all the non-redundant GNs
   if [ "${#gb_files[@]}" -gt 0 ]; then
-    # echo "${gb_files[*]}" >> $logfile
+    # Generate the .accessions file for the NR gb files
+    acc_file="$dir"/$(basename "$dir").accessions
+    touch "$acc_file"
+    echo '' > "$acc_file"
+    for gb_file in "${gb_files[@]}"; do
+      # Extract the accessions from the given file
+      "${script_dir}"extract_accessions.py "$gb_file" "$acc_file"
+    done
+    # Generate phylo data for all the non-redundant GNs 
     "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$dir"/all_non_redundants.krona.html
+  fi
+
+  sort -u "$acc_file" -o "$acc_file"
+
+  # Now extract the accessions from the indexed label file
+  if [ -z "$index_file" -o -z "$index_label_file" ]; then
+    :
+  else
+    # Build a new subset label file from the accession lines in the indexed label file
+    tmp_label_file="$dir"/"$label_file_name".tmp
+    touch "$tmp_label_file"
+    echo '' > "$tmp_label_file"
+
+    "${script_dir}"get_index_subset.py "$index_file" "$index_label_file" "$acc_file" "$tmp_label_file"
+  
+    # Merge the new tmp file into the LF
+    "${script_dir}"modify_label_file.py "$label_file_location" -l "$tmp_label_file"
+    rm "$tmp_label_file"
   fi
 
   # Copy all GNs into new non-redundants directory
@@ -388,7 +450,9 @@ do
   cp "$dir"/*.gb "$dir"/all_non_redundants
 
   # Run clustering on NR directory
-  "${script_dir}"find_clusters.py "$dir"/all_non_redundants "$(basename "$dir" | cut -f1 -d ".")_non_redundant" --max_genes $((2*$num_flanking_genes+1))
+  "${script_dir}"find_clusters.py "$dir"/all_non_redundants "$(basename "$dir" | cut -f1 -d ".")_non_redundant" --max_genes $((2*"$num_flanking_genes"+1))
+
+        # "${script_dir}"find_clusters.py "$s" "$(basename "$s")" --max_genes $((2*"$num_flanking_genes"+1))
 
   # Run plotting on NR clusters
   echo "Generating phylogeny data and clinker plots for all non-redundant clusters in $dir" >> "$logfile"
@@ -436,7 +500,7 @@ do
       fi
 
       # Generate kmer clusters (second argument is for first part of cluster dir name)
-      "${script_dir}"find_clusters.py "$s" "$(basename "$s")" --max_genes $((2*$num_flanking_genes+1))
+      "${script_dir}"find_clusters.py "$s" "$(basename "$s")" --max_genes $((2*"$num_flanking_genes"+1))
 
       # If there are clusters, generate Krona and Clinker plots for each cluster
       if [[ $(ls "$s" | wc -l) -gt 0 ]]; then
