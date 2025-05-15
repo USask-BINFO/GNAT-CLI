@@ -44,6 +44,75 @@ function serialise(svg) {
 	return new Blob([string], {type: "image/svg+xml"});
 }
 
+function gnat_serialise(svg) {
+	/* Saves the figure to SVG in its current state.
+   * Without the cluster names and legend, only the clusters and genes are shown.
+   * Called by the GNAT app to save each cluster as a SVG for the dashboard and previews.
+	 * Clones the provided SVG and sets the width/height of the clone to the
+	 * bounding box of the original SVG. Thus, downloaded figures will be sized
+	 * correctly.
+	 * This function returns a new Blob, which can then be downloaded.
+	*/
+
+	let node = svg.node()
+		.cloneNode(true)
+
+	// Remove all hidden elements
+	d3.select(node)
+		.selectAll(".hidden")
+		.remove()
+
+  // Remove all <g> elements in the legend
+  d3.select(node)
+    .selectAll("g.legend")
+    .remove()
+
+  // Remove all <g> elements in the scale bar
+  d3.select(node)
+    .selectAll("g.scaleBar")
+    .remove()
+
+  // Remove all <g> elements in the colour bar
+  d3.select(node)
+    .selectAll("g.colourBar")
+    .remove()
+
+  // Remove all <g> elements in clusters with class clusterInfo
+  d3.select(node)
+    .selectAll("g.clusterInfo")
+    .remove()
+
+	// Draw filtered node in hidden <div> to calculate real bounding box
+	let container = svg.node().parentNode
+	let div = d3.select(container)
+		.append("div")
+		.attr("visibility", "hidden")
+	div.append(() => node)
+	let bbox = div.select("g.clusterMapG").node().getBBox()
+	div.remove()
+
+	const xmlns = "http://www.w3.org/2000/xmlns/"
+	const xlinkns = "http://www.w3.org/1999/xlink"
+	const xhtml = "http://www.w3.org/1999/xhtml"
+	const svgns = "http://www.w3.org/2000/svg"
+
+	node.setAttribute("width", bbox.width);
+	node.setAttribute("height", bbox.height);
+	node.setAttributeNS(xmlns, "xmlns", svgns);
+	node.setAttributeNS(xmlns, "xmlns:xlink", xlinkns);
+	node.setAttributeNS(xmlns, "xmlns:xhtml", xhtml);
+
+	// Adjust x/y of <g> to account for axis/title position.
+	// Replaces the transform attribute, so drag/zoom is ignored.
+	d3.select(node)
+		.select("g.clusterMapG")
+		.attr("transform", `translate(${Math.abs(bbox.x)}, ${Math.abs(bbox.y)})`)
+
+	const serializer = new window.XMLSerializer;
+	const string = serializer.serializeToString(node);
+	return new Blob([string], {type: "image/svg+xml"});
+}
+
 function download(blob, filename) {
 	/* Downloads a given blob to filename.
 	 * This function appends a new anchor to the document, which points to the
