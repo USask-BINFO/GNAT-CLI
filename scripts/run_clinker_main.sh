@@ -3,6 +3,7 @@
 # Script to run clinker/main.py from main.sh without adding scripts/clinker to $PATH
 
 POSITIONAL_ARGS=()
+GENERATE_SVG="false"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -20,6 +21,11 @@ while [[ $# -gt 0 ]]; do
       ;;
     -lf)
       LABELFILE="$2"
+      shift
+      shift
+      ;;
+    -gf)
+      GENERATE_SVG="$2"
       shift
       shift
       ;;
@@ -45,3 +51,22 @@ if [[ ${#POSITIONAL_ARGS[@]} -lt 1 ]]; then
 fi
 
 python "$(echo "${BASH_SOURCE[0]}" | rev | cut -d'/' -f2- | rev)"/clinker/main.py "${POSITIONAL_ARGS[@]}" -p "$PLOTNAME" -lf "$LABELFILE"
+
+# If -gf == 'true' then generate the svg of the plot
+if [[ "$GENERATE_SVG" == "true" ]]; then
+  script_dir="$(dirname "${BASH_SOURCE[0]}")"
+
+  svg_script="$script_dir"/../../node_tools/extract_svg.js
+
+  if [[ ! -f "$svg_script" ]]; then
+    echo "SVG script not found at $svg_script"
+    exit 1
+  fi
+  if [[ ! -f "$PLOTNAME" ]]; then
+    echo "Clinker plot file not found at $PLOTNAME"
+    exit 1
+  fi
+
+  # Generate the SVG file
+  /home/njt694/.nvm/versions/node/v20.19.2/bin/node "$svg_script" "$PLOTNAME"
+fi

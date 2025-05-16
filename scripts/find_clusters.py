@@ -475,125 +475,125 @@ def main():
 
         cluster_scores.append((cluster, score))
 
-        for i in range(len(all_orientations)):
-            # Change the representation of the orientation blocks
-            before = all_orientations[i]["before"]
-            match = all_orientations[i]["match"]
-            after = all_orientations[i]["after"]
+        # for i in range(len(all_orientations)):
+        #     # Change the representation of the orientation blocks
+        #     before = all_orientations[i]["before"]
+        #     match = all_orientations[i]["match"]
+        #     after = all_orientations[i]["after"]
             
-            if all_orientations[i]["match_idx"] is None:
-                continue
+        #     if all_orientations[i]["match_idx"] is None:
+        #         continue
 
-            match = [1 for _ in range(len(match[0]))]
-            match[all_orientations[i]["match_idx"]] = 0
+        #     match = [1 for _ in range(len(match[0]))]
+        #     match[all_orientations[i]["match_idx"]] = 0
 
-            multiplier = -1
-            new_before = []
-            for j in range(len(before)-1,-1,-1):
-                new_before = [1 * multiplier for _ in range(len(before[j]))] + new_before
-                multiplier *= -1
-            before = new_before
+        #     multiplier = -1
+        #     new_before = []
+        #     for j in range(len(before)-1,-1,-1):
+        #         new_before = [1 * multiplier for _ in range(len(before[j]))] + new_before
+        #         multiplier *= -1
+        #     before = new_before
 
-            multiplier = -1
-            new_after = []
-            for j in range(len(after)):
-                new_after += [1 * multiplier for _ in range(len(after[j]))]
-                multiplier *= -1
-            after = new_after
+        #     multiplier = -1
+        #     new_after = []
+        #     for j in range(len(after)):
+        #         new_after += [1 * multiplier for _ in range(len(after[j]))]
+        #         multiplier *= -1
+        #     after = new_after
 
-            if all_orientations[i]["match_strand"] == -1:
-                # If match is on the negative strand, flip the orientations
-                before, after, match = after[::-1], before[::-1], match[::-1]
+            # if all_orientations[i]["match_strand"] == -1:
+            #     # If match is on the negative strand, flip the orientations
+            #     before, after, match = after[::-1], before[::-1], match[::-1]
 
-            all_orientations[i]["before"] = before
-            all_orientations[i]["match"] = match
-            all_orientations[i]["after"] = after
-            all_orientations[i]["full"] = before + match + after
+            # all_orientations[i]["before"] = before
+            # all_orientations[i]["match"] = match
+            # all_orientations[i]["after"] = after
+            # all_orientations[i]["full"] = before + match + after
         
         # Use the representations in all_orientations to calculate the 'average' GN for the cluster
         # Align the representations on the match gene
-        frequency_position_list = [{} for _ in range(args.max_genes)]
-        for i in range(len(all_orientations)):
-            # Pad the representations with None to ensure they are all the same length, 
-            # ensure at least (max_genes - 1)/2 on each side of match
-            before = all_orientations[i]["before"].copy()
-            match = all_orientations[i]["match"].copy()
-            after = all_orientations[i]["after"].copy()
+        # frequency_position_list = [{} for _ in range(args.max_genes)]
+        # for i in range(len(all_orientations)):
+        #     # Pad the representations with None to ensure they are all the same length, 
+        #     # ensure at least (max_genes - 1)/2 on each side of match
+        #     before = all_orientations[i]["before"].copy()
+        #     match = all_orientations[i]["match"].copy()
+        #     after = all_orientations[i]["after"].copy()
 
-            pivot_flag = False
-            for j in range(len(match)):
-                orientation = match[j]
-                if orientation == 0:
-                    pivot_flag = True
-                    continue
+        #     pivot_flag = False
+        #     for j in range(len(match)):
+        #         orientation = match[j]
+        #         if orientation == 0:
+        #             pivot_flag = True
+        #             continue
 
-                if not pivot_flag:
-                    before.append(orientation)
-                else:
-                    after = [orientation] + after
+        #         if not pivot_flag:
+        #             before.append(orientation)
+        #         else:
+        #             after = [orientation] + after
             
             # Ensure before and after have exactly n elements
             # Pads with None if less than n
             # Truncates furthest element if greater than n
             #   Only ever exceeds n if the edge gene has another gene overlapping it (e.g. some viral genomes)
-            flanking_n = (args.max_genes - 1)/2
-            while len(before) != flanking_n:
-                if len(before) < flanking_n:
-                    before = [None] + before
-                elif len(before) > flanking_n:
-                    before = before[1:]
+            # flanking_n = (args.max_genes - 1)/2
+            # while len(before) != flanking_n:
+            #     if len(before) < flanking_n:
+            #         before = [None] + before
+            #     elif len(before) > flanking_n:
+            #         before = before[1:]
             
-            while len(after) != flanking_n:
-                if len(after) < flanking_n:
-                    after = after + [None]
-                elif len(after) > flanking_n:
-                    after = after[:-1]
+            # while len(after) != flanking_n:
+            #     if len(after) < flanking_n:
+            #         after = after + [None]
+            #     elif len(after) > flanking_n:
+            #         after = after[:-1]
             
-            # Concatenation of the max-sized flanks plus the match
-            full = before + [0] + after
+            # # Concatenation of the max-sized flanks plus the match
+            # full = before + [0] + after
 
-            all_orientations[i]["padded"] = full
+            # all_orientations[i]["padded"] = full
 
             # Get the frequencies of the orientation at each possible position in the GNs to calculate the averages
-            for j in range(len(full)):
-                orientation = full[j]
-                if orientation is not None:
-                    if j not in frequency_position_list:
-                        frequency_position_list[j] = {}
-                        # try:
-                        #     frequency_position_list[j] = {}
-                        # except IndexError:
-                        #     print(f"j: {j}")
-                        #     print(f"len(frequency_position_list): {len(frequency_position_list)}")
-                        #     print(f"len(full): {len(full)}")
-                        #     print(f"frequency_position_list: {frequency_position_list}")
-                        #     print(f"full: {full}")
-                        #     print(f"all_orientations[i]: {all_orientations[i]}")
-                        #     frequency_position_list[j] = {}
-                        #     exit()
-                    if orientation not in frequency_position_list[j]:
-                        frequency_position_list[j][orientation] = 1
-                    else:
-                        frequency_position_list[j][orientation] += 1
-                else:
-                    if "None" not in frequency_position_list[j]:
-                        frequency_position_list[j]["None"] = 1
-                    else:
-                        frequency_position_list[j]["None"] += 1
+            # for j in range(len(full)):
+            #     orientation = full[j]
+            #     if orientation is not None:
+            #         if j not in frequency_position_list:
+            #             frequency_position_list[j] = {}
+            #             # try:
+            #             #     frequency_position_list[j] = {}
+            #             # except IndexError:
+            #             #     print(f"j: {j}")
+            #             #     print(f"len(frequency_position_list): {len(frequency_position_list)}")
+            #             #     print(f"len(full): {len(full)}")
+            #             #     print(f"frequency_position_list: {frequency_position_list}")
+            #             #     print(f"full: {full}")
+            #             #     print(f"all_orientations[i]: {all_orientations[i]}")
+            #             #     frequency_position_list[j] = {}
+            #             #     exit()
+            #         if orientation not in frequency_position_list[j]:
+            #             frequency_position_list[j][orientation] = 1
+            #         else:
+            #             frequency_position_list[j][orientation] += 1
+            #     else:
+            #         if "None" not in frequency_position_list[j]:
+            #             frequency_position_list[j]["None"] = 1
+            #         else:
+            #             frequency_position_list[j]["None"] += 1
         
         # Get the most common orientations from frequency_position_list
-        max_orientations = []
-        for freqs in frequency_position_list:
-            max_orientation = None
-            max_freq = 0
-            for orientation in freqs.keys():
-                if freqs[orientation] > max_freq:
-                    max_orientation = orientation
-                    max_freq = freqs[orientation]
-                elif freqs[orientation] == max_freq:
-                    # Placeholder to handle edge case where there's a tie
-                    pass
-            max_orientations.append(max_orientation)
+        # max_orientations = []
+        # for freqs in frequency_position_list:
+        #     max_orientation = None
+        #     max_freq = 0
+        #     for orientation in freqs.keys():
+        #         if freqs[orientation] > max_freq:
+        #             max_orientation = orientation
+        #             max_freq = freqs[orientation]
+        #         elif freqs[orientation] == max_freq:
+        #             # Placeholder to handle edge case where there's a tie
+        #             pass
+        #     max_orientations.append(max_orientation)
 
         # # Testing        
         # for i in range(len(all_orientations)):
@@ -601,7 +601,7 @@ def main():
         # print(max_orientations)
         # exit()
 
-        average_representations[str(score)] = {'avg_orientations': max_orientations, 'num_GNs': len(names), 'cluster': cluster}
+        # average_representations[str(score)] = {'avg_orientations': max_orientations, 'num_GNs': len(names), 'cluster': cluster}
 
 
     # Sort the clusters based on scores
@@ -634,8 +634,8 @@ def main():
             score_file.write(str(score))
 
         # Output average GN
-        average_gn = average_representations[str(score)]['avg_orientations']
-        generate_svg.create_svg_from_orientation(average_gn, path.join(cluster_dir, ".representation.svg"))
+        # average_gn = average_representations[str(score)]['avg_orientations']
+        # generate_svg.create_svg_from_orientation(average_gn, path.join(cluster_dir, ".representation.svg"))
 
 
 main()

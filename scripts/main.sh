@@ -468,7 +468,7 @@ do
             "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$cluster_dir"/all_non_redundants.krona.html
           fi
 
-          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location"
+          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location" -gf "$gnat_flag"
 
           mkdir "$cluster_dir"/genbank_files
           mv "$cluster_dir"/*.gb "$cluster_dir"/genbank_files
@@ -516,7 +516,7 @@ do
             "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$cluster_dir"/$(basename "$cluster_dir").krona.html
           fi
 
-          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location"
+          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location" -gf "$gnat_flag"
 
           mkdir "$cluster_dir"/genbank_files
           mv "$cluster_dir"/*.gb "$cluster_dir"/genbank_files
