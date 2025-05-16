@@ -538,6 +538,9 @@ class Gene(Serializer):
                                     self.names[f"{class_names[i]}_(custom_{str(i)})"] = f"{class_labels[i]} ({colour})"
                                 else:
                                     self.names[f"{class_names[i]}_(custom_{str(i)})"] = f"{class_labels[i]}"
+                else:
+                    # Add placeholder for missing protein_id
+                    self.names["protein_id"] = f"{self.uid}_placeholder"
 
 
     def to_dict(self):

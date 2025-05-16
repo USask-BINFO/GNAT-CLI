@@ -254,6 +254,11 @@ def clinker(
                                 #     n_colour_map[idx][label].append(colour)
                                 # else:
                                 #     n_colour_map[idx][label] = [colour]
+                
+                else:
+                    # Assign a placeholder protein_id to the gene
+                    # This is a hack to get the re-colouring to work with gene groups with no accessions
+                    gene.names['protein_id'] = f"{uid}_placeholder"
 
             # Done extracting label file data for the genes in the plot
 
