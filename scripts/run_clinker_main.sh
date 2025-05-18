@@ -29,6 +29,11 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
+    -sm)
+      SVG_MAP_FILE="$2"
+      shift
+      shift
+      ;;
     *)
       if [[ "$1" == *".gb" ]]; then
         POSITIONAL_ARGS+=("$1")
@@ -69,4 +74,23 @@ if [[ "$GENERATE_SVG" == "true" ]]; then
 
   # Generate the SVG file
   /home/njt694/.nvm/versions/node/v20.19.2/bin/node "$svg_script" "$PLOTNAME"
+
+  # Add the mapping of the SVG location to the Clinker plot location (if SVG_MAP_FILE is provided)
+  if [[ -n "$SVG_MAP_FILE" ]]; then
+
+    BASENAME=$(basename "$PLOTNAME" .html)
+    SVG_FILE="$(dirname "$PLOTNAME")/.${BASENAME}.svg"
+
+    if [[ ! -f "$SVG_FILE" ]]; then
+      echo "SVG file not found at $SVG_FILE"
+      exit 1
+    fi
+
+    MAP_DIR=$(dirname "$SVG_MAP_FILE");
+
+    REL_SVG_FILE=$(realpath --relative-to="$MAP_DIR" "$SVG_FILE");
+    REL_PLOTNAME=$(realpath --relative-to="$MAP_DIR" "$PLOTNAME");
+
+    echo "${REL_SVG_FILE}:${REL_PLOTNAME}" >> "$SVG_MAP_FILE";
+  fi
 fi

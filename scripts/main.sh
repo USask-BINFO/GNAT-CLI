@@ -183,6 +183,12 @@ else
     echo "[ $out_tag ] Error: job directory $outdir doesn't exist. This shouldn't be possible..."
     exit 1;
   fi
+
+  # Intialize the SVG map file for the dashboard
+  svg_map="$outdir"/."$out_tag"_svg_map.txt
+  if [ ! -f "$svg_map" ]; then
+    touch "$svg_map"
+  fi
 fi
 
 # Create log file
@@ -469,7 +475,7 @@ do
             "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$cluster_dir"/all_non_redundants.krona.html
           fi
 
-          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location" -gf "$gnat_flag"
+          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location" -gf "$gnat_flag" -sm "$svg_map"
 
           mkdir "$cluster_dir"/genbank_files
           mv "$cluster_dir"/*.gb "$cluster_dir"/genbank_files
@@ -517,7 +523,7 @@ do
             "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$cluster_dir"/$(basename "$cluster_dir").krona.html
           fi
 
-          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location" -gf "$gnat_flag"
+          "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location" -gf "$gnat_flag" -sm "$svg_map"
 
           mkdir "$cluster_dir"/genbank_files
           mv "$cluster_dir"/*.gb "$cluster_dir"/genbank_files
