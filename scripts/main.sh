@@ -324,10 +324,10 @@ if [ -z ${label_file_location+x} ];
 then
   # Make sure no label file already exists
   if [ -f "$out_tag".label ]; then
-    echo "$out_tag.label already exists in output directory. Please specify a different label file location. Exiting..." >> "$logfile"
-    echo "[ $out_tag ] $out_tag.label already exists in output directory. Please specify a different label file location. Exiting..."
     echo "Job failed" >> "$logfile"
     echo "[ $out_tag ] Job failed"
+    echo "$out_tag.label already exists in output directory. Please specify a different label file location. Exiting..." >> "$logfile"
+    echo "[ $out_tag ] $out_tag.label already exists in output directory. Please specify a different label file location. Exiting..."
     exit 1
   else
     echo "No label file specified, creating new $out_tag.label in output directory." >> "$logfile"
@@ -358,10 +358,10 @@ parsed_directories=()
 
 # Check if a .parsed file was created
 if ! ls *.parsed 1> /dev/null 2>&1; then
-  echo "No non-redundant PSI-BLAST matches to any query. Exiting..." >> "$logfile"
-  echo "[ $out_tag ] No non-redundant PSI-BLAST matches to any query. Exiting..."
   echo "Job failed" >> "$logfile"
   echo "[ $out_tag ] Job failed"
+  echo "No non-redundant PSI-BLAST matches to any query. Exiting..." >> "$logfile"
+  echo "[ $out_tag ] No non-redundant PSI-BLAST matches to any query. Exiting..."
   exit 0
 fi
 
@@ -390,9 +390,10 @@ done
 
 # Check if there are any matches after filtering, if not, exit.
 if [[ $num_matches -eq 0 ]]; then
+  echo "Job failed" >> "$logfile"
+  echo "[ $out_tag ] Job failed"
   echo "No non-redundant PSI-BLAST matches to any query. Exiting..." >> "$logfile"
   echo "[ $out_tag ] No non-redundant PSI-BLAST matches to any query. Exiting..."
-  echo "Job failed" >> "$logfile"
   exit 0
 fi
 
