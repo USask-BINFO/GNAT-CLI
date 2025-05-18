@@ -360,8 +360,8 @@ parsed_directories=()
 if ! ls *.parsed 1> /dev/null 2>&1; then
   echo "Job failed" >> "$logfile"
   echo "[ $out_tag ] Job failed"
-  echo "No non-redundant PSI-BLAST matches to any query. Exiting..." >> "$logfile"
-  echo "[ $out_tag ] No non-redundant PSI-BLAST matches to any query. Exiting..."
+  echo "No PSI-BLAST matches were found. Exiting..." >> "$logfile"
+  echo "[ $out_tag ] No PSI-BLAST matches were found. Exiting..."
   exit 0
 fi
 
@@ -392,8 +392,8 @@ done
 if [[ $num_matches -eq 0 ]]; then
   echo "Job failed" >> "$logfile"
   echo "[ $out_tag ] Job failed"
-  echo "No non-redundant PSI-BLAST matches to any query. Exiting..." >> "$logfile"
-  echo "[ $out_tag ] No non-redundant PSI-BLAST matches to any query. Exiting..."
+  echo "No PSI-BLAST matches were found. Exiting..." >> "$logfile"
+  echo "[ $out_tag ] No PSI-BLAST matches were found. Exiting..."
   exit 0
 fi
 
