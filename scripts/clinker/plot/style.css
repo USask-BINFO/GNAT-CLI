@@ -159,9 +159,59 @@ div#plot {
 }
 
 #loading {
-	position: fixed;
-	top: 50%;
-	left: 50%;
+	position: absolute; 
+	top: 50%; 
+	left: 50%; 
 	transform: translate(-50%, -50%);
+	width: 100px; 
+	height: 100px;
 	z-index: 1000;
 }
+
+.spinner-container {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: 200px;
+  }
+  
+  .spinner {
+	position: relative;
+	width: 100px;
+	height: 100px;
+  }
+  
+  .dot {
+	--i: 0;
+	--angle: calc(var(--i) * 45deg); /* 8 dots around 360° */
+	--radius: 40px;
+  
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: rotate(var(--angle)) translate(var(--radius)) rotate(calc(-1 * var(--angle)));
+  }
+  
+  .dot::before {
+	content: '';
+	display: block;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background-color: #105938;
+	animation: pulse 1.5s infinite;
+	animation-delay: calc((7 - var(--i)) * -0.1875s); /* clockwise delay cycle */
+  }
+  
+  @keyframes pulse {
+	0%, 100% {
+	  transform: scale(1);
+	  opacity: 0; /* invisible at smallest */
+	}
+	50% {
+	  transform: scale(1.5);
+	  opacity: 1; /* fully visible at largest */
+	}
+  }
+  
+  
