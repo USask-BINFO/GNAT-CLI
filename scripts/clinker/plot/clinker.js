@@ -1196,6 +1196,15 @@ function setGroupProducts(groups=data.groups) {
                   productFreqs[product] = 1;
                 }
               }
+
+              // Check if the gene is a PSI-BLAST match
+              if ("psi_blast_match" in gene.names && gene.names["psi_blast_match"] != null && gene.names["psi_blast_match"].trim() != "") {
+                if (product in productFreqs) {
+                  productFreqs[gene.names["match_very_short"]] = 999;
+                } else {
+                  productFreqs[gene.names["match_very_short"]] = 999;
+                }
+              }
             }
           }
         }
@@ -1207,6 +1216,10 @@ function setGroupProducts(groups=data.groups) {
     for (let i = 0; i < sortedProducts.length; i++) {
       productList.push(sortedProducts[i][0]);
     }
+
+    // If the group contains a PSI-BLAST match, prepend the Query name to the product list
+
+
     group.products = productList;
   }
 }
