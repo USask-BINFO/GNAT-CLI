@@ -92,7 +92,7 @@
         nameFontSize: 12,
         lociFontSize: 10,
         hideLocusCoordinates: false,
-        spacing: 40,
+        spacing: 50,
         alignLabels: true,
       },
       locus: {
@@ -114,7 +114,7 @@
         label: {
           anchor: "start",
           fontSize: 10,
-          rotation: 45,
+          rotation: 25,
           position: "top",
           spacing: 2,
           show: false,
