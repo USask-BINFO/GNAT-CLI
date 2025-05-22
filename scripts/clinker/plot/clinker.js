@@ -275,7 +275,20 @@ function plot(data) {
   if (data.classes != null) {
     if (data.classes.length > 0) {
       for (let c of data.classes) {
-        classNames.add(c.name);
+        // Verify the new class doesn't contain all non-labeled groups (e.g., verify every group name isn't "Group #")
+        if (c.groups.length > 0) {
+          let allNonLabeled = true;
+          for (let g of c.groups) {
+            if (!g.label.startsWith("Group ") && !(g.colour == "#808080")) {
+              allNonLabeled = false;
+              break;
+            }
+          }
+
+          if (!allNonLabeled) {
+            classNames.add(c.name);
+          }
+        }
       }
     }
   }
