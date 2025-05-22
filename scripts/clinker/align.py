@@ -893,6 +893,7 @@ class Group(Serializer):
         self.colour = colour
         self.level = level # Level of the group (e.g., 0 for default PID groups, 1 for class 1 in new label file, 2 for class 2, and so on)
         self.labeled = labeled  # Whether the group contains genes from the label file
+        self.baseLabel = self.label.split(":")[0].strip()
 
     def to_dict(self):
         return {
@@ -902,7 +903,8 @@ class Group(Serializer):
             "hidden": self.hidden,
             "colour": self.colour,
             "level": self.level,
-            "labeled": self.labeled
+            "labeled": self.labeled,
+            "baseLabel": self.baseLabel,
         }
 
     @classmethod
@@ -914,6 +916,7 @@ class Group(Serializer):
             hidden=d.get("hidden"),
             colour=d.get("colour"),
             level=d.get("level"),
-            labeled=d.get("labeled")
+            labeled=d.get("labeled"),
+            baseLabel=d.get("baseLabel"),
         )
 

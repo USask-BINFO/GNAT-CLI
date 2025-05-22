@@ -294,6 +294,7 @@ def clinker(
             
                 n_fn.append(default_fn)
                 n_colour_map.append(default_colours) # Looks like all of these colours are [None], since the groups haven't been built yet?
+                # print(f"-----------------------------------------------------------\nDefault Colours: {default_colours}\n-----------------------------------------------------------")
                 n_new_labels.append(default_labels)
                 n_default_ordering.append(default_order)
 
@@ -423,6 +424,8 @@ def clinker(
 
                 # Get the class name from the header
                 class_name = label_obj.header.split(",")[i * 2 + 3]
+
+                # print(labeled_groups)
 
                 new_group = globaligner.build_gene_groups_return(functions=fn, colour_map=colour_map, use_links=False, level=i+1, order=default_order, labeled_groups=labeled_groups)
                 globaligner.classes.append({"name": class_name, "groups": new_group})

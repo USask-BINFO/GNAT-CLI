@@ -808,7 +808,6 @@ function plot(data) {
               "genes": fn[groupLabel],
               "hidden": true,
               "colour": colourMap[groupLabel],
-              "disableNum": labeledGroup,
               "labeled": labeledGroup,
               "baseLabel": groupLabel.split(": ")[0].trim()
             }
@@ -924,7 +923,7 @@ function plot(data) {
     // Need to check if group.groupNum exists!
     if (d3.select(this).property("checked")) {
       for (let group of data.groups) {
-        if (!group.disableNum && !group.labeled) {
+        if (!group.labeled) {
           if (group.label.includes("Group "+group.groupNum)) {}
           else {(group.label != "" && group.label != " ")
           ? group.label = "Group "+group.groupNum+": "+group.label
@@ -933,7 +932,7 @@ function plot(data) {
       }
     } else {
       for (let group of data.groups) {
-        if (!group.disableNum && !group.labeled) {
+        if (!group.labeled) {
           if (group.label.includes("Group "+group.groupNum)) {
             if (group.label.indexOf(": ") != -1) {
               group.label = group.label.split(": ").slice(1,).join(": ")
@@ -1168,7 +1167,7 @@ function setGroupNums(groups=data.groups) {
   let groupNum = 0;
   for (let group of groups) {
     // Check if group.groupNum exists
-    if (!group.disableNum) {
+    if (!group.labeled) {
       group.groupNum = groupNum;
     }
     groupNum++;
@@ -1241,7 +1240,7 @@ function updateGroupProductsDisplay(n) {
     if (d3.select("#input-group-label-show").property("checked")) {
       group.label = group.baseLabel + ": "+newArr.join(" | ");
     } else {
-      if (!group.disableNum) {
+      if (!group.labeled) {
         group.label = newArr.join(" | ");
       } else {
         // If it's a label group, add the products to the baseLabel
@@ -1261,10 +1260,10 @@ function setGroupAttributes() {
         let baseLabel = group.label.split(": ")[0].trim();
         group.baseLabel = baseLabel;
 
-        if (baseLabel.includes("Group ")) {
-          group.disableNum = false;
+        if (baseLabel.startsWith("Group ")) {
+          group.labeled = false;
         } else {
-          group.disableNum = true;
+          group.labeled = true;
         }
       }
       setGroupNums(tier.groups);
@@ -1277,10 +1276,10 @@ function setGroupAttributes() {
     let baseLabel = group.label.split(": ")[0].trim();
     group.baseLabel = baseLabel;
 
-    if (baseLabel.includes("Group ")) {
-      group.disableNum = false;
+    if (baseLabel.startsWith("Group ")) {
+      group.labeled = false;
     } else {
-      group.disableNum = true;
+      group.labeled = true;
     }
   }
   setGroupNums(data.groups);
