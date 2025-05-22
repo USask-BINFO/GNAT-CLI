@@ -327,6 +327,10 @@ function plot(data) {
       // Wipe data.groups
       data.groups = [];
 
+      // // Create a set of the added group labels
+      // let addedLabeledGroups = new Set();
+      // let addedLabeledGroupsColours = {};
+
       // Add each group from the selected class (index) to data.groups
       for (let i = 0; i < data.classes[groupIdx].groups.length; i++) {
         data.classes[groupIdx].groups[i].hidden = false;
@@ -343,6 +347,41 @@ function plot(data) {
     updateGroupProductsDisplay(numProducts);
 
     plot.call(chart);
+
+    // Now that the groups are added and coloured if their colours were null, go through them again to make sure groups with the same label are the same colour
+    let labeledGroups = new Set();
+    let labeledGroupsColours = {};
+    let updatedGroups = [];
+
+    for (let i = 0; i < data.groups.length; i++) {
+      let g = data.groups[i];
+
+      if (g.labeled) {
+        // Get the core of the label (e.g., "AbiD (Homologous Group 1)" -> "AbiD")
+        let coreLabel = g.baseLabel.split(" (")[0].trim();
+
+        // Check if the group label is already in the set
+        if (labeledGroups.has(coreLabel)) {
+          // If it is, set this group's colour to the same as the existing one
+          // alert(coreLabel + " already in set.");
+          // alert("Old colour: " + g.colour + "\nNew colour: " + labeledGroupsColours[coreLabel]);
+          g.colour = labeledGroupsColours[coreLabel];
+        } else {
+          // If it isn't, add the group label to the set and set the colour
+          // alert(coreLabel + " not in set.");
+          labeledGroups.add(coreLabel);
+          labeledGroupsColours[coreLabel] = g.colour;
+        }
+      }
+      
+      updatedGroups.push(g);
+    }
+
+    data.groups = [];
+    data.groups = updatedGroups;
+
+    plot.call(chart);
+
     boldGroupSetUp();
   });
 
