@@ -781,9 +781,8 @@ function plot(data) {
 
           for (let groupLabel of order) {
             let labeledGroup = false; // Flag to disable GroupNum toggling
-
             if (groupLabel in names) {
-              if (names[groupLabel] != groupLabel) {
+              if (names[groupLabel] != groupLabel || names[groupLabel].includes("Homologous")) {
                 // Group name updated, set labeledGroup to true
                 labeledGroup = true;
               }
@@ -810,6 +809,7 @@ function plot(data) {
               "hidden": true,
               "colour": colourMap[groupLabel],
               "disableNum": labeledGroup,
+              "labeled": labeledGroup,
               "baseLabel": groupLabel.split(": ")[0].trim()
             }
 
@@ -924,7 +924,7 @@ function plot(data) {
     // Need to check if group.groupNum exists!
     if (d3.select(this).property("checked")) {
       for (let group of data.groups) {
-        if (!group.disableNum) {
+        if (!group.disableNum && !group.labeled) {
           if (group.label.includes("Group "+group.groupNum)) {}
           else {(group.label != "" && group.label != " ")
           ? group.label = "Group "+group.groupNum+": "+group.label
@@ -933,7 +933,7 @@ function plot(data) {
       }
     } else {
       for (let group of data.groups) {
-        if (!group.disableNum) {
+        if (!group.disableNum && !group.labeled) {
           if (group.label.includes("Group "+group.groupNum)) {
             if (group.label.indexOf(": ") != -1) {
               group.label = group.label.split(": ").slice(1,).join(": ")
