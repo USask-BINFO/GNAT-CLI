@@ -556,7 +556,7 @@ class Globaligner(Serializer):
         for group in self.groups:
             group.genes = list(group.genes)
 
-    def build_gene_groups_return(self, functions: Optional[Dict[str, List[str]]]=None, colour_map=defaultdict(None), use_links=False, level=0, hidden=True, order=[], labeled_groups=[]) -> List[Dict]:
+    def build_gene_groups_return(self, functions: Optional[Dict[str, List[str]]]=None, colour_map=defaultdict(None), use_links=False, level=0, hidden=True, order=[], labeled_groups=[], psiblast_groups=[]) -> List[Dict]:
         """Builds gene groups based on functions and stored gene-gene links (optional).
         
         `functions` maps genes to user-assigned functions; keys should correspond
@@ -580,6 +580,9 @@ class Globaligner(Serializer):
             group contains a gene from the label file. If the length of this list is unequal to 
             the length of the order list, all items in labeled_groups will be set to False.
 
+        `psiblast_groups` is the same as labeled_groups but has flags for whether the group contains
+            PSI-BLAST matches.
+
         e.g., If genes A and B are both assigned as category Z, and have links to
             genes C and D, respectively, the result will be a single group Z,
             containing genes A, B, C and D. Group Z is first made with genes A and B,
@@ -600,14 +603,19 @@ class Globaligner(Serializer):
                 print("Warning: The number of items in labeled_groups does not match the number of items in order. Setting all items in labeled_groups to False.")
                 labeled_groups = [False] * len(order)
 
+            if len(psiblast_groups) != len(order):
+                print("Warning: The number of items in psiblast_groups does not match the number of items in order. Setting all items in psiblast_groups to False.")
+                psiblast_groups = [False] * len(order)
+
             for i in range(len(order)):
                 labeled = labeled_groups[i]
                 label = order[i]
+                psiblast_match = psiblast_groups[i]
 
                 genes = functions[label]
                 uids = self.get_gene_uids(genes)
 
-                group = Group(label=label, genes=set(uids), level=level, hidden=hidden, colour=colour_map[label], labeled=labeled)
+                group = Group(label=label, genes=set(uids), level=level, hidden=hidden, colour=colour_map[label], labeled=labeled, match=psiblast_match)
                 groups.append(group)                
             # for function, genes in functions.items():
             #     uids = self.get_gene_uids(genes)
@@ -885,7 +893,7 @@ class Link(Serializer):
 class Group(Serializer):
     """A gene homology group."""
 
-    def __init__(self, uid=None, label=None, genes=None, hidden=False, colour=None, level=None, labeled=False):
+    def __init__(self, uid=None, label=None, genes=None, hidden=False, colour=None, level=None, labeled=False, match=False):
         self.uid = uid if uid else str(uuid.uuid4())
         self.label = label if label else f"Group {self.uid}"
         self.genes = genes if genes else []
@@ -893,6 +901,7 @@ class Group(Serializer):
         self.colour = colour
         self.level = level # Level of the group (e.g., 0 for default PID groups, 1 for class 1 in new label file, 2 for class 2, and so on)
         self.labeled = labeled  # Whether the group contains genes from the label file
+        self.match = match
         self.baseLabel = self.label.split(":")[0].strip()
 
     def to_dict(self):
@@ -904,6 +913,7 @@ class Group(Serializer):
             "colour": self.colour,
             "level": self.level,
             "labeled": self.labeled,
+            "match": self.match,
             "baseLabel": self.baseLabel,
         }
 
@@ -917,6 +927,7 @@ class Group(Serializer):
             colour=d.get("colour"),
             level=d.get("level"),
             labeled=d.get("labeled"),
+            match=d.get("match"),
             baseLabel=d.get("baseLabel"),
         )
 

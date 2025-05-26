@@ -377,6 +377,53 @@ function plot(data) {
       updatedGroups.push(g);
     }
 
+    // Go through the groups again and parse the PSI-BLAST match groups if they haven't been coloured yet
+    for (let i = 0; i < updatedGroups.length; i++) {
+      let g = updatedGroups[i];
+
+      // If the group is a PSI-BLAST match group, check if it's already been re-coloured
+      if (g.match == true) {
+        if (g.colour == "#808080") {
+          // If it hasn't been coloured, get the PSI-BLAST match label from the top of products
+          let matchLabel = g.products[0]
+
+          // Check if the match label is in labeledGroups (either == or as a substring or a superstring)
+          let matches = [];
+
+          for (let label of labeledGroups) {
+            if (label.includes(matchLabel) || matchLabel.includes(label)) {
+              matches.push(label);
+            }
+          }
+
+          let bestMatch = "";
+          let bestMatchCoverage = 0;
+          // If there are matches, find the one with the highest coverage
+          if (matches.length > 0) {
+            for (let label of matches) {
+              let coverage = 0;
+              // Get the coverage of the match label in the group label (using whichever is longer as the denominator)
+              if (label.length > matchLabel.length) {
+                coverage = matchLabel.length / label.length;
+              } else {
+                coverage = label.length / matchLabel.length;
+              }
+
+              if (coverage > bestMatchCoverage) {
+                bestMatchCoverage = coverage;
+                bestMatch = label;
+              }
+            }
+          }
+
+          // If there is a best match, set the colour to the same as the best match
+          if (bestMatch != "") {
+            g.colour = labeledGroupsColours[bestMatch];
+          }
+        }
+      }
+    }
+
     data.groups = [];
     data.groups = updatedGroups;
 
@@ -387,7 +434,8 @@ function plot(data) {
 
   // Populate label type multi select and bind change handler
   let labelTypes = new Set()
-  labelTypes.add("psi_blast_match") // Add psi_blast_match here so that it's always on top of the dropdown list
+  labelTypes.add("all_label_file") // Add labels here so that it's always on top of the dropdown list
+  labelTypes.add("psi_blast_match") 
   labelTypes.add("match_short")
   labelTypes.add("match_very_short")
   data.clusters.forEach(cluster => {
@@ -1036,7 +1084,7 @@ function plot(data) {
 
   
   // Changing the clustermap default config for showing gene labels doesn't work, so have to set it here
-  d3.selectAll("text.geneLabel").each(d => d.label = d.names["psi_blast_match"] ? d.names["psi_blast_match"] : d.names["clear"]); // Default label dynamic_match if present, else clear (" ")
+  d3.selectAll("text.geneLabel").each(d => d.label = d.names["all_label_file"] ? d.names["all_label_file"] : d.names["clear"]); // Default label all label file if present, else clear (" ")
   d3.select("#plot").call(ClusterMap.ClusterMap()
     .config({
       gene: {

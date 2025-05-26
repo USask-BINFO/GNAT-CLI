@@ -217,9 +217,9 @@ def clinker(
         if "Default" not in [c["name"] for c in globaligner.classes]:
             globaligner.classes.append({"name": "Default", "groups": globaligner.groups})
 
-        # If the label file has more than 3 columns, we need to build the class labels
+        # If the label file has more than 3 columns, we need to build the class (tier) labels
         if label_obj is not None and len(label_obj) > 0 and len(label_obj.header.split(",")) > 3:
-            n_label_dict = [{} for _ in range((len(label_obj.header.split(',')) - 3) // 2)] # A label dict for each class column {label: [accessions]}
+            n_label_dict = [{} for _ in range(len(label_obj.header.split(',')) - 3)] # A label dict for each class column {label: [accessions]}
             # n_colour_map = [{} for _ in range((len(label_obj.header.split(',')) - 3) // 2)] # A colour map for each class column {label: [colour(s)]}
 
             # Go through all the accessions in the plot, and build the label dicts and colour maps (i.e., parse out the label file data for the genes present in the plot)
@@ -232,11 +232,10 @@ def clinker(
                         # Split the record into the labels and the classes
                         split = record.rest.split(",")
 
-                        # Get the label and colour for each class
-                        for i in range(2, len(split), 2):
+                        # Get the label for each class
+                        for i in range(2, len(split)):
                             label = split[i]
-                            colour = split[i + 1]
-                            idx = i // 2 - 1
+                            idx = i - 2
 
                             if label in ["", "None", None]:
                                 continue
@@ -269,23 +268,31 @@ def clinker(
             n_colour_map = []
             n_new_labels = []
             n_default_ordering = []
-            for _ in range((len(label_obj.header.split(',')) - 3) // 2):
+            n_psiblast_groups = []
+            for _ in range(len(label_obj.header.split(',')) - 3):
                 default_fn = {}
                 default_colours = {}
                 default_labels = {}
                 default_order = []
+                psiblast_groups = []
                 for i in range(len(default_groups)):
                     group = default_groups[i]
                     # Get the gene accessions for the group (From the UIDs)
                     default_fn[group.label] = []
+                    is_match = False
                     for gene_uid in group.genes:
                         # Get the gene accession from the UID
-                        if 'protein_id' in globaligner._genes[gene_uid].names:
+                        gene_names = globaligner._genes[gene_uid].names
+                        if 'protein_id' in gene_names:
                             # If the gene has a protein ID, use that
                             gene_acc = globaligner._genes[gene_uid].names['protein_id']
                         else:
                             gene_acc = gene_uid # Make sure this works TODO
+
+                        if 'psi_blast_match' in gene_names and gene_names['psi_blast_match'] not in [None, 'None'] and gene_names['psi_blast_match'].strip() != "":
+                            is_match = True
                         default_fn[group.label].append(gene_acc)
+                    psiblast_groups.append(is_match)
                     # default_fn[group.label] = group.genes
                     # print(f"Group {group.label} has the following attributes (and values): {group.__dict__}")
                     default_colours[group.label] = [group.colour]
@@ -297,6 +304,7 @@ def clinker(
                 # print(f"-----------------------------------------------------------\nDefault Colours: {default_colours}\n-----------------------------------------------------------")
                 n_new_labels.append(default_labels)
                 n_default_ordering.append(default_order)
+                n_psiblast_groups.append(psiblast_groups)
 
             # Now we have all the data we need to build the new groups (homology extended and non-homologous subclass)
             # 1 - If a gene from the label file is in a homology group, re-name the homology group to the label (e.g., Group 3 --> "Abi2 (Homology Group 3)")
@@ -391,6 +399,7 @@ def clinker(
                 colour_map = n_colour_map[i]
                 default_order = n_default_ordering[i]
                 labeled_groups = []
+                psiblast_groups = n_psiblast_groups[i]
                 names = n_new_labels[i]
 
                 for j in range(len(default_order)):
@@ -423,11 +432,11 @@ def clinker(
                     colour_map[group_name] = colour_map[group_name][0]
 
                 # Get the class name from the header
-                class_name = label_obj.header.split(",")[i * 2 + 3]
+                class_name = label_obj.header.split(",")[i + 3]
 
                 # print(labeled_groups)
 
-                new_group = globaligner.build_gene_groups_return(functions=fn, colour_map=colour_map, use_links=False, level=i+1, order=default_order, labeled_groups=labeled_groups)
+                new_group = globaligner.build_gene_groups_return(functions=fn, colour_map=colour_map, use_links=False, level=i+1, order=default_order, labeled_groups=labeled_groups, psiblast_groups=psiblast_groups)
                 globaligner.classes.append({"name": class_name, "groups": new_group})
 
     if globaligner.alignments:

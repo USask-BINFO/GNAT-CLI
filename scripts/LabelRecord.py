@@ -48,6 +48,8 @@ class LabelRecord:
     
     # ----- Checking evalues -----
     def get_e_value(self):
+        if self.rest.split(',')[1].strip() == '':
+            return Decimal("Infinity")
         return Decimal(self.rest.split(',')[1])
 
     def e_value_lt(self, other):
@@ -80,13 +82,13 @@ class LabelRecord:
         return len(self.rest.split(',')) > 2
     
     def get_num_classes(self):
-        return (len(self.rest.split(',')) - 2) // 2
+        return (len(self.rest.split(',')) - 2)
     
     def get_class_n_label(self, n):
         if not self.has_classes():
             return None
         classes = self.rest.split(',')[2:]
-        return classes[n * 2]
+        return classes[n]
 
     def get_class_n_colour(self, n):
         if not self.has_classes():
@@ -96,20 +98,23 @@ class LabelRecord:
     
     # ----- Modifying Class Info -----
     def set_class_n_label(self, n, label):
+        """
+            n: index of class to set (starts at 0)
+        """
         if not self.has_classes():
             return False
         classes = self.rest.split(',')
-        classes[n * 2] = label
+        classes[n] = label
         self.rest = ','.join(classes)
         return True
     
-    def set_class_n_colour(self, n, colour):
-        if not self.has_classes() or not self.is_hex_string(colour):
-            return False
-        classes = self.rest.split(',')
-        classes[n * 2 + 1] = colour
-        self.rest = ','.join(classes)
-        return True
+    # def set_class_n_colour(self, n, colour):
+    #     if not self.has_classes() or not self.is_hex_string(colour):
+    #         return False
+    #     classes = self.rest.split(',')
+    #     classes[n * 2 + 1] = colour
+    #     self.rest = ','.join(classes)
+    #     return True
     
     def pad_new_classes(self, n):
         """
@@ -118,9 +123,10 @@ class LabelRecord:
         classes = self.rest.split(',')
         start, classes = classes[:2], classes[2:]
         
-        if len(classes) < 2 * n:
-            classes += [''] * (2 * n - len(classes))
-        elif len(classes) > 2 * n:
+        while len(classes) < n:
+            classes += ['']
+
+        if len(classes) > n:
             return False
 
         self.rest = ','.join(start + classes)

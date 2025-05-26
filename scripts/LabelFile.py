@@ -109,16 +109,11 @@ class LabelFile:
         :return: The generated header.
         """
         parts = line.split(self.delim)
-        header_string = "#Accession,Label,E_Value"
+        header_string = "#All_Accessions,Match_Label,Match_E_Value"
         if len(parts) > 3:
             # File has extra columns
-            for i, col in enumerate(parts[3:]):
-                if i % 2 == 0:
-                    # Label line
-                    header_string += f",Class_{i // 2}"
-                else:
-                    # Colour line
-                    header_string += f",Class_{i // 2}_Colour"
+            for i in range(len(parts[3:])):
+                header_string += f",Tier_{i}"
         return header_string
     
     def __len__(self):
@@ -237,8 +232,11 @@ class LabelFile:
                 return
             else:
                 # New record has a smaller e-value, so we need to replace the old one
-                new_rest = new_record.rest
-                existing.rest = new_rest
+                # Only replace the start of the rest (leave the tiers if they exist)
+                existing_rest = existing.rest.split(',')
+                new_rest = new_record.rest.split(',')
+                existing.rest = ','.join(new_rest[:2] + existing_rest[2:])
+
                 return
 
         else:
@@ -255,7 +253,7 @@ class LabelFile:
         """
         records = SortedList()
         # Record.rest has the format "label,e_value,class_0_label,class_0_colour,class_1_label,class_1_colour,..."
-        idx = n * 2 + 2 # index of the class label we're interested in
+        idx = n # index of the class label we're interested in
 
         for record in self:
             split = record.rest.split(',')
@@ -276,7 +274,7 @@ class LabelFile:
 
         # Add the new column names to the header
         for name in names:
-            self.header += "," + name + "," + name + "_Colour"
+            self.header += "," + name
 
         # Add the new column names to each record in the sorted list
         for record in self:
@@ -297,20 +295,14 @@ class LabelFile:
         parts = self.header.split(',')
         idx = 3
         while idx < len(parts):
-            if idx % 2 == 0:
-                # Skip the class colour
-                idx += 1
-                continue
-            else:
-                if parts[idx] == name:
-                    # Found the right column
-                    break
+            if parts[idx] == name:
+                break
+            idx += 1
 
         if idx >= len(parts):
             return False
         
         # Remove the column name from the header
-        del parts[idx]
         del parts[idx]
 
         # Update header
@@ -319,7 +311,6 @@ class LabelFile:
         # For each record, remove the column
         for record in self:
             split = record.rest.split(',')
-            del split[idx]
             del split[idx]
             record.rest = ','.join(split)
 

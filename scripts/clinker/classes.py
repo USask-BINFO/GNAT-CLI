@@ -489,9 +489,33 @@ class Gene(Serializer):
 
         self.names["clear"] = ' ' # Blank label for the clear button
 
+        def make_class_labels(self, split_record, split_header):
+            class_labels = []
+            # class_colours = []
+
+            for i in range(2, len(split_record)):
+                if split_record[i].strip() != "":
+                    class_labels.append(split_record[i])
+                # class_colours.append(split_record[i + 1])
+
+            class_names = []
+            # If we have class labels, extract their names from the header
+            if len(class_labels) > 0:
+                for i in range(3, len(split_header)):
+                    class_names.append(split_header[i])
+
+            # Add custom labels as text to names
+            for i, _ in enumerate(class_labels):
+                if class_labels[i] not in [None, '']:
+                    self.names[f"{class_names[i]}_(custom_{str(i)})"] = f"{class_labels[i]}"
+            
+            # Return a concatenated string of the new labels
+            return '; '.join(class_labels)
+
         if gnat_label:
             label_obj = label_obj_container[0]
             if label_obj is not None:
+                self.names["all_label_file"] = None
                 self.names["psi_blast_match"] = None
                 self.names["match_short"] = None
                 self.names["match_very_short"] = None
@@ -501,6 +525,7 @@ class Gene(Serializer):
                 # if label_obj.classes:
                 #     for i, c in enumerate(label_obj.classes):
                 #         class_labels[c["label_name"]] = (i, None)
+                
 
 
                 if "protein_id" in self.names:
@@ -509,35 +534,32 @@ class Gene(Serializer):
                     record = label_obj.get_record(accession)
                     if record is not None:
                         split_record = record.rest.split(label_obj.delim)
+                        split_header = label_obj.header.split(',')
 
                         label, e_value = split_record[0], split_record[1]
 
-                        class_labels = []
-                        class_colours = []
+                        if label.strip() != "":
+                            self.names["psi_blast_match"] = f"{accession} ({label}, {e_value})"
+                            self.names["match_short"] = f"{label} ({e_value})"
+                            self.names["match_very_short"] = label
+                            
+                            label_str = make_class_labels(self, split_record, split_header)
 
-                        for i in range(2, len(split_record), 2):
-                            class_labels.append(split_record[i])
-                            class_colours.append(split_record[i + 1])
+                            if label_str != '':
+                                self.names["all_label_file"] = f"{label}; {label_str})"
+                            else:
+                                self.names["all_label_file"] = f"{label}"
 
-                        class_names = []
-                        # If we have class labels, extract their names from the header
-                        if len(class_labels) > 0:
-                            split_header = label_obj.header.split(',')
-                            for i in range(3, len(split_header), 2):
-                                class_names.append(split_header[i])
+                        else:
+                            # Not a PSI-BLAST match (no label in PSI-BLAST match column)
+                            self.names["psi_blast_match"] = None
+                            self.names["match_short"] = None
+                            self.names["match_very_short"] = None
 
-                        self.names["psi_blast_match"] = f"{accession} ({label}, {e_value})"
-                        self.names["match_short"] = f"{label} ({e_value})"
-                        self.names["match_very_short"] = label
+                            label_str = make_class_labels(self, split_record, split_header)
 
-                        # Add custom labels as text to names
-                        for i, label_name in enumerate(class_labels):
-                            if class_labels[i] not in [None, '']:
-                                colour = class_colours[i]
-                                if type(colour) == str and colour.startswith('#'):
-                                    self.names[f"{class_names[i]}_(custom_{str(i)})"] = f"{class_labels[i]} ({colour})"
-                                else:
-                                    self.names[f"{class_names[i]}_(custom_{str(i)})"] = f"{class_labels[i]}"
+                            self.names["all_label_file"] = f"{label_str}"
+
                 else:
                     # Add placeholder for missing protein_id
                     self.names["protein_id"] = f"{self.uid}_placeholder"

@@ -37,7 +37,7 @@ if args.parsed:
     # Read the parsed PSI-BLAST output file
     if label_file.header is None:
         # Add a default header
-        label_file.header = "#Accession,Label,E_Value"
+        label_file.header = "#All_Accessions,Match_Label,Match_E_Value"
 
     with open(args.parsed, "r") as f:
         for line in f:
@@ -68,7 +68,7 @@ if args.merge_label_file:
 
     # Get class names from headers
     def get_class_names(header_parts):
-        return [header_parts[i] for i in range(3, len(header_parts)) if i % 2 == 1]
+        return [header_parts[i] for i in range(3, len(header_parts))]
 
     lf_class_names = get_class_names(lf_parts)
     mf_class_names = get_class_names(mf_parts)
@@ -83,7 +83,7 @@ if args.merge_label_file:
     # Add any classes from mf not in lf to the end of lf
     for mf_name in mf_class_names:
         if mf_name not in lf_class_names:
-            lf_parts += [mf_name, f"{mf_name}_Colour"]
+            lf_parts += [mf_name]
             lf_class_names.append(mf_name)
 
     # Rebuild index lookup for the extended lf header
@@ -108,14 +108,14 @@ if args.merge_label_file:
     new_len = len(label_file.header.split(','))
 
     # Pad the label file with empty columns for the new classes
-    print(f"Padding label file with {new_len - old_len} empty columns.")
+    # print(f"Padding label file with {new_len - old_len} empty columns.")
     if new_len > old_len:
         extra_cols = new_len - old_len
         for record in label_file:
             record.rest += ',' + ','.join([''] * extra_cols)
 
-    print("Extended lf_header:", lf_header)
-    print("mf_new_line_indices:", mf_new_line_indices)
+    # print("Extended lf_header:", lf_header)
+    # print("mf_new_line_indices:", mf_new_line_indices)
 
     # Read the merge label file
     print(f"Adding new lines to label file from {args.merge_label_file}.")
@@ -158,6 +158,8 @@ if args.merge_label_file:
             label_file.add_line(new_line)
 
             added += 1
+
+            # print(new_line)
 
     print(f"Added {added} new lines to label file.")
 
