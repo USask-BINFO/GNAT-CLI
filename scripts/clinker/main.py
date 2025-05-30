@@ -320,6 +320,7 @@ def clinker(
                 colour_map = n_colour_map[i]
                 names = n_new_labels[i]
                 default_fn = n_fn[i]
+                psiblast_groups = n_psiblast_groups[i]
 
                 acc_to_labels = {v: k for k, vals in label_dict.items() for v in vals}
                 acc_to_group = {v: k for k, vals in default_fn.items() for v in vals}
@@ -390,6 +391,22 @@ def clinker(
 
                         # Add the label to the order list
                         n_default_ordering[i].append(label)
+
+                if len(n_default_ordering[i]) > len(psiblast_groups):
+                    # Check if the new gene_accs contain PSI-BLAST matches
+                    while len(psiblast_groups) < len(n_default_ordering[i]):
+                        new_order_label = n_default_ordering[i][len(psiblast_groups)]
+
+                        for gene_acc in default_fn[new_order_label]:
+                            # Check if the new group has PSI-BLAST matches, add relevant tag to PSI-BLAST match list
+                            record = label_obj.get_record(gene_acc)
+
+                            if record is None or record.rest.split(',')[0].strip() == "":
+                                psiblast_groups.append(False)
+                            else:
+                                psiblast_groups.append(True)
+                        
+                    n_psiblast_groups[i] = psiblast_groups
 
                 # Homology genes should already all be in there
                 
