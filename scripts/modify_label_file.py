@@ -4,8 +4,6 @@ Script to update the match labelling file used to label matches in the clinker p
 Can also be used to change the name of matches in the label file (e.g., rename acc. # to protein name).
 """
 import argparse
-from sys import stdout
-from label_cls import LabelObject
 from os import path
 from LabelFile import LabelFile
 
