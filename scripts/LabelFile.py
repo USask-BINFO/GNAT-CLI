@@ -108,12 +108,13 @@ class LabelFile:
         :param line: The line to generate the header from.
         :return: The generated header.
         """
-        parts = line.split(self.delim)
         header_string = "#All_Accessions,Match_Label,Match_E_Value"
-        if len(parts) > 3:
-            # File has extra columns
-            for i in range(len(parts[3:])):
-                header_string += f",Tier_{i}"
+        if line is not None:
+            parts = line.split(self.delim)
+            if len(parts) > 3:
+                # File has extra columns
+                for i in range(len(parts[3:])):
+                    header_string += f",Tier_{i}"
         return header_string
     
     def __len__(self):
@@ -141,6 +142,10 @@ class LabelFile:
         
         elif path.getsize(filename) > self.max_file_size:
             raise ValueError(f"Label file {filename} is too large ({self.__human_readable_size__(path.getsize(filename))}). Please check the file size. It should be less than {self.__human_readable_size__(self.max_file_size)}.")
+        
+        elif path.getsize(filename) == 0:
+            # File is empty, just set a default header
+            self.header = self.__generate_header_from_line__(None)
         
         else:
             with open(filename, "r") as f:
