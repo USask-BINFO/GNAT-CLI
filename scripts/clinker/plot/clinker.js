@@ -377,21 +377,72 @@ function plot(data) {
       updatedGroups.push(g);
     }
 
+    function tokenize(label) {
+      // Split label on whitespace and '_'
+      return label.split(/[\s_]+/);
+    }
+
+    function isSublist(shorter, longer) {
+      for (let i = 0; i <= longer.length - shorter.length; i++) {
+        let match = true;
+        for (let j = 0; j < shorter.length; j++) {
+          if (longer[i + j] !== shorter[j]) {
+            match = false;
+            break;
+          }
+        }
+        if (match) return true;
+      }
+      return false;
+    }
+
+    function longestCommonRun(list1, list2) {
+      let maxRun = 0;
+
+      for (let i = 0; i < list1.length; i++) {
+        for (let j = 0; j < list2.length; j++) {
+          let runLength = 0;
+          while (
+            i + runLength < list1.length &&
+            j + runLength < list2.length &&
+            list1[i + runLength] === list2[j + runLength]
+          ) {
+            runLength++;
+          }
+          if (runLength > maxRun) {
+            maxRun = runLength;
+          }
+        }
+      }
+
+      return maxRun;
+    }
+
     // Go through the groups again and parse the PSI-BLAST match groups if they haven't been coloured yet
     for (let i = 0; i < updatedGroups.length; i++) {
       let g = updatedGroups[i];
-
       // If the group is a PSI-BLAST match group, check if it's already been re-coloured
       if (g.match == true) {
         if (g.colour == "#808080") {
           // If it hasn't been coloured, get the PSI-BLAST match label from the top of products
-          let matchLabel = g.products[0]
+          let matchLabel = g.products[0];
+          let matchLabelList = tokenize(matchLabel);
 
           // Check if the match label is in labeledGroups (either == or as a substring or a superstring)
           let matches = [];
 
           for (let label of labeledGroups) {
-            if (label.includes(matchLabel) || matchLabel.includes(label)) {
+            console.log(label)
+            console.log(matchLabel)
+            let labelList = tokenize(label);
+            let isMatch = false;
+            if (labelList.length < matchLabelList.length) {
+              isMatch = isSublist(labelList, matchLabelList);
+            } else {
+              isMatch = isSublist(matchLabelList, labelList);
+            }
+
+            if (isMatch) {
               matches.push(label);
             }
           }
@@ -401,13 +452,10 @@ function plot(data) {
           // If there are matches, find the one with the highest coverage
           if (matches.length > 0) {
             for (let label of matches) {
-              let coverage = 0;
-              // Get the coverage of the match label in the group label (using whichever is longer as the denominator)
-              if (label.length > matchLabel.length) {
-                coverage = matchLabel.length / label.length;
-              } else {
-                coverage = label.length / matchLabel.length;
-              }
+              let labelList = tokenize(label);
+
+              // Get the coverage of the match label in the group label
+              let coverage = longestCommonRun(labelList, matchLabelList);
 
               if (coverage > bestMatchCoverage) {
                 bestMatchCoverage = coverage;
@@ -417,7 +465,7 @@ function plot(data) {
           }
 
           // If there is a best match, set the colour to the same as the best match
-          if (bestMatch != "") {
+          if (bestMatch !== "") {
             g.colour = labeledGroupsColours[bestMatch];
           }
         }
