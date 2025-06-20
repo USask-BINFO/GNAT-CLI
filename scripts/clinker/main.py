@@ -397,14 +397,16 @@ def clinker(
                     while len(psiblast_groups) < len(n_default_ordering[i]):
                         new_order_label = n_default_ordering[i][len(psiblast_groups)]
 
+                        psiblast_flag = False
                         for gene_acc in default_fn[new_order_label]:
                             # Check if the new group has PSI-BLAST matches, add relevant tag to PSI-BLAST match list
                             record = label_obj.get_record(gene_acc)
 
-                            if record is None or record.rest.split(',')[0].strip() == "":
-                                psiblast_groups.append(False)
-                            else:
-                                psiblast_groups.append(True)
+                            if record is not None and record.rest.split(',')[0].strip() != "":
+                                psiblast_flag = True
+                                break
+
+                        psiblast_groups.append(psiblast_flag)
                         
                     n_psiblast_groups[i] = psiblast_groups
 
