@@ -616,11 +616,8 @@ class Globaligner(Serializer):
                 uids = self.get_gene_uids(genes)
 
                 group = Group(label=label, genes=set(uids), level=level, hidden=hidden, colour=colour_map[label], labeled=labeled, match=psiblast_match)
-                groups.append(group)                
-            # for function, genes in functions.items():
-            #     uids = self.get_gene_uids(genes)
-            #     group = Group(label=function, genes=set(uids), level=level, hidden=hidden, colour=colour_map[function])
-            #     groups.append(group)
+                groups.append(group)
+
         if use_links:
             if not self._links:
                 for group in groups:
