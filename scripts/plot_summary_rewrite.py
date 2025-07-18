@@ -77,6 +77,74 @@ def log_data(data):
         return single_data
     else:
         return double_data
+    
+def split_by_tier(data, levels=1, semicolon=False):
+    """
+    Split a dict or a singly nested dict containing tier labels into subdicts keyed on tier number.
+    :data: A dict (or nested dict) containing tiered labels
+    :levels: How many levels the dict has (nested = 2). Default = 1 (not nested).
+    :semicolon: Boolean flag for 'labels_per_gn_unique_co_localized' since the co-localization map for those is in the key.
+    return: A dict containing the mappings of the data dict keyed on tier numbers.
+    """
+    # Needs to work with: "labels_per_gn_unique" (1)
+    #                     "labels_per_gn_unique_co_localized" (1)
+    #                     "total_labels" (1)
+    #                     "label_products" (2)
+    #                     "co_localized_label_products" (2)
+
+    if levels not in [1, 2]:
+        # Not allowed
+        print(f"Error: 'levels' in 'split_by_tier()' must be one of [1, 2]. Received '{levels}'. Returning None.")
+        return None
+    
+    if data is None:
+        print(f"Error: provided data in 'split_by_tier()' is 'None'. Returning None.")
+        return None
+    
+    if not semicolon:
+        mapped = {}
+        for label in data:
+            base, tier = format_label(label)
+            if tier not in mapped:
+                mapped[tier] = {}
+            
+            mapped[tier][base] = data[label]
+        
+        return mapped
+
+    else:
+        mapped = {}
+        for co_loc_label in data:
+            labels = co_loc_label.split(';')
+
+            tiers = {}
+
+            for label in labels:
+                base, tier = format_label(label)
+
+                if tier not in tiers:
+                    tiers[tier] = []
+                
+                if base not in tiers[tier]:
+                    tiers[tier].append(base)
+                
+            
+            for tier in tiers:
+                names = sorted(tiers[tier])
+
+                if len(names) > 1:
+                    names_str = ';'.join(names)
+                
+                    if tier not in mapped:
+                        mapped[tier] = {}
+                    
+                    if names_str not in mapped[tier]:
+                        mapped[tier][names_str] = 0
+
+                    mapped[tier][names_str] += data[co_loc_label]
+        
+        return mapped
+
 
 # --------------------------------------------
 # Plot functions
@@ -269,12 +337,13 @@ def co_localized_heatmap(data, title, max_n=None, is_int=True):
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    return fig
+    return fig_to_svg(fig)
 
-def sunburst_plot(label_products, is_psiblast=False):
+def sunburst_plot(label_products, title, is_psiblast=False):
     """
     Generates a sunburst plot mapping labels to their product annotation counts.
     :param label_products: Dict mapping str label_name to dict str product_annotation: int count
+    :param title: str plot title.
     :param is_psiblast: Bool indicating if labels are from PSI-BLAST, if True doesn't try remove trailing tier # from label
     return: HTML for the sunburst plot
     """
@@ -289,7 +358,7 @@ def sunburst_plot(label_products, is_psiblast=False):
 
     df = pd.DataFrame(rows)
 
-    fig = pex.sunburst(df, path=["Label", "Product"], values="Count", width=700, height=700)
+    fig = pex.sunburst(df, path=["Label", "Product"], values="Count", width=700, height=700, title=title)
 
     # Uncomment to remove labels for sunburst plot (for figure)
     # fig.update_traces(textinfo='none')
@@ -300,10 +369,9 @@ def sunburst_plot(label_products, is_psiblast=False):
 # --------------------------------------------
 # HTML functions
 # --------------------------------------------
-def make_query_section(query_name, query_data, num_flanking_genes=15):
+def make_query_section(query_data, num_flanking_genes=15):
     """
     Build the HTML section for a single query. Return the HTML as a string.
-    :param query_name: str query name
     :param query_data: The data from the summary JSON for the given query name. (e.g., data['query_names'][query_name_0]).
     :param num_flanking_genes: The max number of flanking genes in each GN. Used to score plots on number of labels. Default=15.
     return: HTML string for the query
@@ -344,8 +412,8 @@ def make_query_section(query_name, query_data, num_flanking_genes=15):
     average_labels_per_gene = total_labelled / total_genes if total_genes > 0 else 0
     average_labels_per_gn = total_labelled / total_gns if total_gns > 0 else 0
 
-    section += f"<p><b>Percentage (%) of Genes Annotated: {average_labels_per_gene * 100:.0f}%</b></p>"
-    section += f"<p><b>Percentage (%) of Genes Annotated per Genomic Neighbourhood: {average_labels_per_gn * 100:.0f}%</b></p>"
+    section_string += f"<p><b>Percentage (%) of Genes Annotated: {average_labels_per_gene * 100:.0f}%</b></p>"
+    section_string += f"<p><b>Percentage (%) of Genes Annotated per Genomic Neighbourhood: {average_labels_per_gn * 100:.0f}%</b></p>"
 
     job_score = total_labelled / (total_gns * max_width)
 
@@ -373,53 +441,118 @@ def make_query_section(query_name, query_data, num_flanking_genes=15):
     
     if len(above_score_plots) > 0:
         above_score_plots = sort_plots(above_score_plots)
-        section += f"<p><b>Plots with Above-Average Numbers of Labelled Genes per Maximal Genomic Neighbourhood (Highest to Lowest):</b></p>"
-        section += "<ul>"
+        section_string += f"<p><b>Plots with Above-Average Numbers of Labelled Genes per Maximal Genomic Neighbourhood (Highest to Lowest):</b></p>"
+        section_string += "<ul>"
         for file in above_score_plots:
-            section += f"<li><a href=/read_file?path={file['path']}>{file['filename']}</a>"
-        section += "</ul>"
+            section_string += f"<li><a href=/read_file?path={file['path']}>{file['filename']}</a>"
+        section_string += "</ul>"
     else:
-        section += "<p><b>No plots found with above-average numbers of labelled genes.</b></p>"
+        section_string += "<p><b>No plots found with above-average numbers of labelled genes.</b></p>"
 
     # PSI-BLAST Section
     if query_data['num_psiblast'] > 0:
-        section += "<h2>PSI-BLAST Annotations Summary</h2>"
+        section_string += "<h2>PSI-BLAST Annotations Summary</h2>"
 
         # Bar Charts
         if query_data.get('psiblast_per_gn_unique'):
-            section += bar_chart(query_data['psiblast_per_gn_unique'], "Genomic Neighbourhoods Containing PSI-BLAST Annotated Genes")
+            section_string += bar_chart(query_data['psiblast_per_gn_unique'], "Total Genomic Neighbourhoods with PSI-BLAST Annotations")
         
         if query_data.get('total_psiblast'):
-            section += bar_chart(query_data['total_psiblast'], "Genes Annotated by PSI-BLAST")
+            section_string += bar_chart(query_data['total_psiblast'], "Total Genes with PSI-BLAST Annotations")
 
         # Sunburst
         if query_data.get('psiblast_products'):
             title = "Summary of NCBI Product Annotations Linked to PSI-BLAST Labels"
-            section += f"<h3>{title}</h3>"
-            section += sunburst_plot(query_data['psiblast_products'], psiblast=True)
+            section_string += f"<h3>{title}</h3>"
+            section_string += sunburst_plot(query_data['psiblast_products'], title, is_psiblast=True)
 
         # Product heatmap
         if query_data.get('co_localized_psiblast_products'):
             title = "NCBI Product Annotations Linked to PSI-BLAST Labels"
             max_products = 5
-            section += f"<h3>{title}</h3>"
-            section += f"<p>Retaining only the top {max_products} products from each label.</p>"
-            section += co_localized_heatmap(query_data['co_localized_psiblast_products'], title, max_products=max_products, is_int=True)
+            section_string += f"<h3>{title}</h3>"
+            section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
+            section_string += co_localized_heatmap(query_data['co_localized_psiblast_products'], title, max_n=max_products, is_int=True)
 
             title = "Log10 " + title
-            section += f"<h3>{title}</h3>"
-            section += f"<p>Retaining only the top {max_products} products from each label.</p>"
+            section_string += f"<h3>{title}</h3>"
+            section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
             logged_data = log_data(query_data['co_localized_psiblast_products'])
-            section += co_localized_heatmap(logged_data, title, max_products=max_products, is_int=False)
+            section_string += co_localized_heatmap(logged_data, title, max_n=max_products, is_int=False)
 
     # Tier Label Sections
+    if query_data.get("num_labeled") and query_data['num_labeled'] > 0:
+        section_string += "<h2>User-Defined Annotations Summary by Tier</h2>"
 
+        # Loop over each tier
+        tiers = []
+        tier_map = {}
+
+        for label in query_data["labels_per_gn_unique"]:
+            tier = int(label.split('_')[-1])
+            if tier not in tiers:
+                tiers.append(tier)
+                tier_map[tier] = [label]
+            else:
+                tier_map[tier].append(label)
+
+        tiers = sorted(tiers)
+
+        tiered_labels_per_gn_unique = split_by_tier(query_data.get('labels_per_gn_unique'))
+        tiered_labels_per_gn_unique_co_localized = split_by_tier(query_data.get('labels_per_gn_unique_co_localized'), semicolon=True)
+        tiered_total_labels = split_by_tier(query_data.get('total_labels'))
+        tiered_label_products = split_by_tier(query_data.get('label_products'), levels=2)
+        tiered_co_localized_label_products = split_by_tier(query_data.get('co_localized_label_products'), levels=2)
+
+        print(tiered_labels_per_gn_unique.get('1'))
+        print(query_data.get('labels_per_gn_unique_co_localized'))
+        print(tiered_labels_per_gn_unique_co_localized)
+
+        for tier in tiers:
+            tier = str(tier)
+            section_string += f"<h2>Tier {tier} Summary</h2>"
+
+            # Bar Charts
+            if tiered_labels_per_gn_unique and tiered_labels_per_gn_unique.get(tier):
+                section_string += bar_chart(tiered_labels_per_gn_unique.get(tier), f"Total Genomic Neighbourhoods with User-Defined Annotations: Tier {tier}")
+            if tiered_total_labels and tiered_total_labels.get(tier):
+                section_string += bar_chart(tiered_total_labels.get(tier), f"Total Genes with User-Defined Annotations: Tier {tier}")
+            
+            # Sunburst
+            if tiered_label_products and tiered_label_products.get(tier):
+                section_string += sunburst_plot(tiered_label_products.get(tier), f"Summary of NCBI Product Annotations Linked to User-Defined Labels: Tier {tier}", is_psiblast=False,)
+
+            # Label Heatmap
+            if tiered_labels_per_gn_unique_co_localized and tiered_labels_per_gn_unique_co_localized.get(tier):
+                title = f"Co-Occurrence Patterns Among Tier {tier} User-Annotated Genes"
+                section_string += co_localized_heatmap(tiered_labels_per_gn_unique_co_localized.get(tier), title, is_int=True)
+
+                logged_data = log_data(tiered_labels_per_gn_unique_co_localized.get(tier))
+                
+                section_string += co_localized_heatmap(logged_data, "Log10 " + title, is_int=False)
+
+            # Product Heatmap
+            if tiered_co_localized_label_products and tiered_co_localized_label_products.get(tier):
+                title = f"NCBI Product Annotations Linked to Tier {tier} User-Defined Labels"
+                max_products = 5
+
+                section_string += f"<h3>{title}</h3>"
+                section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
+                section_string += co_localized_heatmap(tiered_co_localized_label_products.get(tier), title, max_n=max_products, is_int=True)
+
+                title = "Log10 " + title
+                section_string += f"<h3>{title}</h3>"
+                section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
+                logged_data = log_data(tiered_co_localized_label_products.get(tier))
+                section_string += co_localized_heatmap(logged_data, title, max_n=max_products, is_int=False)
+
+    return section_string
 
 
 def write_full_report(query_sections, outfile):
     """
     Writes the final HTML report by adding header info and joining provided sections. If len(query_sections) == 1, removes overall header and formats for a single query name.
-    :param query_sections: The HTML for each query name.
+    :param query_sections: List of the HTML for each query name.
     :param outfile: The location and name of the file to write to.
     return: None, writes to outfile
     """
@@ -497,7 +630,8 @@ if __name__ == "__main__":
     parser = ArgumentParser("Generate a visualization file from the GNAT summary JSON.")
     parser.add_argument("json_path", help="Path to summary JSON file. Will write to the same directory if -o | --outdir isn't provided.")
     parser.add_argument("-q", "--query", help="Query name in the JSON summary to generate visualization for. If not provided, generates one visualization file for all query names.")
-    parser.add_argument("-o", "--outfile", help="Location and name of the output visualization file. If not provided, outputs 'gnat_summary.html' to the directory containing the summary JSON file.")
+    parser.add_argument("-o", "--outfile", help="Location and name of the output visualization file. If not provided, outputs 'gnat_summary_report.html' to the directory containing the summary JSON file.")
+    parser.add_argument("-n", "--num_flanking_genes", help="Maximum number of flanking genes in each GN. Used to calculate label averages to display the most densly labelled plots. Defaults to 15.", default=15)
 
     args = parser.parse_args()
 
@@ -513,6 +647,16 @@ if __name__ == "__main__":
     else:
         provided_query = None
 
+    flanking = int(args.num_flanking_genes)
+
+    # Parse out location
+    if args.outfile:
+        outfile = args.outfile
+    else:
+        # Use JSON dir
+        outfile = path.join(json_dir, "gnat_summary_report.html")
+
+
     # Load JSON
     with open(args.json_path) as f:
         summary_json = json.load(f)
@@ -524,4 +668,15 @@ if __name__ == "__main__":
         provided_query = None
 
     if provided_query:
-        # 
+        # If provided query is in the JSON, build the summary for just that query
+        query_section = make_query_section(summary_json['query_names'][provided_query], num_flanking_genes=flanking)
+        write_full_report([query_section], outfile)
+
+    else:
+        # Build for all queries
+        query_sections = []
+
+        for query_name in summary_json['query_names']:
+            query_sections.append(make_query_section(summary_json['query_names'][query_name], num_flanking_genes=flanking))
+
+        write_full_report(query_sections, outfile)
