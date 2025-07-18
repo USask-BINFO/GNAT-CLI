@@ -19,15 +19,24 @@ from os import path
 # --------------------------------------------
 # Helper functions
 # --------------------------------------------
-def fig_to_svg(fig):
+def fig_to_svg(fig, width_pct='50'):
     """
     Convert a matplotlib.pyplot figure to an SVG string.
     :param fig: A figure generated with matplotlib.pyplot (or another library that uses it). E.g., plt.figure()
+    :param width_pct: Desired figure width (in % of page)
     return: String SVG representation of the figure.
     """
     f = StringIO()
+    fig.tight_layout()
     fig.savefig(f, format='svg')
-    return f.getvalue()
+    svg = f.getvalue()
+
+    svg = re.sub(r'width="[^"]+"', '', svg, count=1)
+    svg = re.sub(r'height="[^"]+"', '', svg, count=1)
+
+    svg = re.sub(r'^<svg', '<svg style="max-width: 100%; height: auto;"', svg, count=1)
+
+    return f"<div style='width: {width_pct}%; cursor: pointer;' onclick='downloadSVG(this)'>{svg}</div>"
 
 def sort_plots(plot_list):
     """
@@ -215,13 +224,13 @@ def bar_chart(label_counts, title):
     
     labels, values = zip(*label_counts.items())
 
-    trim_tag_labels = []
-    for label in labels:
-        level = label.split("_")[-1]
-        label = "_".join(label.split("_")[:-1])
-        trim_tag_labels.append(label)
+    # trim_tag_labels = []
+    # for label in labels:
+    #     level = label.split("_")[-1]
+    #     label = "_".join(label.split("_")[:-1])
+    #     trim_tag_labels.append(label)
 
-    ax.barh(trim_tag_labels[::-1], values[::-1], color='#105938')
+    ax.barh(labels[::-1], values[::-1], color='#105938')
     ax.set_title(title)
     ax.set_xlabel("Count")
     ax.set_ylabel("Annotation")
@@ -230,7 +239,12 @@ def bar_chart(label_counts, title):
 
 def co_localized_heatmap(data, title, max_n=None, is_int=True):
     """
-    
+    Generate a heatmap showing label-label or label-product co-localization numbers.
+    :param data: A dict or nested dict containing the co-localization data.
+    :param title: str title of plot
+    :param max_n: For label-product co-localization, max number of products to keep for each label (the most frequent n).
+    :param is_int: True for raw counts, False for Log10 counts
+    return: SVG heatmap str
     """
     # Check if data is one or two layers
     two_layers = False
@@ -333,7 +347,7 @@ def co_localized_heatmap(data, title, max_n=None, is_int=True):
             bar_label += " (Log10 Scale)"
 
     fig, ax = plt.subplots(figsize=(width, height))
-    sns.heatmap(matrix, cmap='Greens', annot=False, ax=ax, cbar_kws={'label': bar_label})
+    sns.heatmap(matrix, cmap='Greens', annot=False, ax=ax, cbar_kws={'label': bar_label}, square=True)
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -588,7 +602,20 @@ def write_full_report(query_sections, outfile):
         
         outstr += query_section
     
+    # Add script to allow SVG downloads
     outstr += """
+    <script>
+        function downloadSVG(container) {
+            const svg = container.querySelector('svg');
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const blob = new Blob([svgData]);
+            const element = document.createElement("a");
+            element.download = "figure.svg";
+            element.href = window.URL.createObjectURL(blob);
+            element.click();
+            element.remove();
+        }
+    </script>
     </body>
     </html>
     """
