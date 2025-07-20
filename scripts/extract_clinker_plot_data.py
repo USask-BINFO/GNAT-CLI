@@ -207,7 +207,7 @@ def extract_plot_data(data, uid_group_map):
                 groups = uid_group_map[gene['uid']]
                 product = gene['names'].get('product', 'unannotated')
 
-                if not product:
+                if not product or product.lower().startswith("uncharacterized") or product.lower().startswith("uncharacterised") or product.lower() == "hypothetical protein":
                     product = "unannotated"
 
                 if len(groups) > 0:
@@ -447,8 +447,20 @@ if __name__ == "__main__":
     merge_nested_dicts(query_data["psiblast_products"], plot_data["psiblast_products"])
     merge_nested_dicts(query_data["co_localized_psiblast_products"], plot_data["psiblast_co_localized_products"])
 
-    # Add plot path
-    query_data["plot_paths"].append(clinker_file)
+    # Add relative plot path mapped to (num_genes, num_labeled + num_psiblast - num_both, num_gns)
+    if job_id and job_id.strip():
+        # If the job_id was provided, try extract the relative path (e.g., the directory == job_id)
+        split_path = clinker_file.split(path.sep)
+        if job_id in split_path:
+            cutoff = 0
+            for i, part in enumerate(split_path):
+                if part == job_id:
+                    cutoff = i
+                    break
+            clinker_file = path.sep.join(split_path[cutoff:])
+        
+    path_data = [plot_data["num_genes"], plot_data["num_labeled"] + plot_data["num_psiblast"] - plot_data["num_both"], plot_data["num_gns"]]
+    query_data["plot_paths"].append({"path": clinker_file, "counts": path_data})
 
     # Update summary values that depend on number of plots
     query_data['labeled_per_plot'] = round(query_data['num_labeled'] / query_data['num_plots'], 2)
