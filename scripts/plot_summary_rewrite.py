@@ -28,7 +28,7 @@ def fig_to_svg(fig, width_pct='50'):
     """
     f = StringIO()
     fig.tight_layout()
-    fig.savefig(f, format='svg')
+    fig.savefig(f, format='svg', bbox_inches='tight')
     svg = f.getvalue()
 
     svg = re.sub(r'width="[^"]+"', '', svg, count=1)
@@ -351,6 +351,7 @@ def co_localized_heatmap(data, title, max_n=None, is_int=True):
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
+    plt.yticks(rotation=0)
     return fig_to_svg(fig)
 
 def sunburst_plot(label_products, title, is_psiblast=False):
@@ -427,7 +428,7 @@ def make_query_section(query_data, num_flanking_genes=15):
     average_labels_per_gn = total_labelled / total_gns if total_gns > 0 else 0
 
     section_string += f"<p><b>Percentage (%) of Genes Annotated: {average_labels_per_gene * 100:.0f}%</b></p>"
-    section_string += f"<p><b>Percentage (%) of Genes Annotated per Genomic Neighbourhood: {average_labels_per_gn * 100:.0f}%</b></p>"
+    section_string += f"<p><b>Average Number of Annotated Genes per Genomic Neighbourhood</b></p>: {average_labels_per_gn:.2f}</b></p>"
 
     job_score = total_labelled / (total_gns * max_width)
 
@@ -517,10 +518,6 @@ def make_query_section(query_data, num_flanking_genes=15):
         tiered_total_labels = split_by_tier(query_data.get('total_labels'))
         tiered_label_products = split_by_tier(query_data.get('label_products'), levels=2)
         tiered_co_localized_label_products = split_by_tier(query_data.get('co_localized_label_products'), levels=2)
-
-        print(tiered_labels_per_gn_unique.get('1'))
-        print(query_data.get('labels_per_gn_unique_co_localized'))
-        print(tiered_labels_per_gn_unique_co_localized)
 
         for tier in tiers:
             tier = str(tier)
@@ -689,7 +686,7 @@ if __name__ == "__main__":
         summary_json = json.load(f)
 
     # Check if provided query is in the JSON
-    if provided_query not in summary_json['query_names'].keys():
+    if provided_query and provided_query not in summary_json['query_names'].keys():
         print(f"Warning: Provided query name {provided_query} not found in the summary JSON. Generating visualization using all query names.")
 
         provided_query = None
