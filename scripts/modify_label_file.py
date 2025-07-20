@@ -116,7 +116,7 @@ if args.merge_label_file:
     # print("mf_new_line_indices:", mf_new_line_indices)
 
     # Read the merge label file
-    print(f"Adding new lines to label file from {args.merge_label_file}.")
+    # print(f"Adding new lines to label file from {args.merge_label_file}.")
     added = 0
     with open(args.merge_label_file, "r") as f:
         # Read the header line
@@ -159,7 +159,7 @@ if args.merge_label_file:
 
             # print(new_line)
 
-    print(f"Added {added} new lines to label file.")
+    # print(f"Added {added} new lines to label file.")
 
 
 
