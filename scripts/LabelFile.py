@@ -233,7 +233,24 @@ class LabelFile:
         if existing is not None:
             # If the key is already in the SortedList, we need to compare the e-values
             if existing.e_value_le(new_record):
-                # Old record has a smaller (or equal) e-value, so skip
+                # Old record has a smaller (or equal) e-value
+                # If old record doesn't have tiers, and new record does, add the tiers
+                # This case happens when merging from the LF DB since those lines don't have E-Values
+                existing_rest = existing.rest.split(',')
+                new_rest = new_record.rest.split(',')
+
+                tier_pairs = zip(existing_rest[2:], new_rest[2:])
+
+                updated_tiers = []
+                for pair in tier_pairs:
+                    if not pair[0].strip() and pair[1].strip(): # Check if existing is '' and new isn't ''
+                        updated_tiers.append(pair[1])
+                    else:
+                        updated_tiers.append(pair[0])
+
+                if updated_tiers:
+                    existing.rest = ','.join(existing_rest[:2] + updated_tiers)
+
                 return
             else:
                 # New record has a smaller e-value, so we need to replace the old one
