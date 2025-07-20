@@ -545,7 +545,7 @@ class Gene(Serializer):
                             
                             label_str = make_class_labels(self, split_record, split_header)
 
-                            if label_str != '':
+                            if label_str:
                                 self.names["all_label_file"] = f"{label}; {label_str})"
                             else:
                                 self.names["all_label_file"] = f"{label}"
