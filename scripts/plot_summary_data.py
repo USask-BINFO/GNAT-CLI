@@ -428,7 +428,8 @@ def make_query_section(query_data, num_flanking_genes=15):
     average_labels_per_gn = total_labelled / total_gns if total_gns > 0 else 0
 
     section_string += f"<p><b>Percentage (%) of Genes Annotated: {average_labels_per_gene * 100:.0f}%</b></p>"
-    section_string += f"<p><b>Average Number of Annotated Genes per Genomic Neighbourhood</b></p>: {average_labels_per_gn:.2f}</b></p>"
+    section_string += f"<p><b>Average Number of Annotated Genes per Genomic Neighbourhood: {average_labels_per_gn:.2f}</b></p>"
+    section_string += f"<p><b>Percentage (%) of Annotated Genes per Maximal Genomic Neighbourhood: {(total_labelled / (total_gns * max_width)) * 100:.0f}%</b></p>"
 
     job_score = total_labelled / (total_gns * max_width)
 
@@ -459,7 +460,7 @@ def make_query_section(query_data, num_flanking_genes=15):
         section_string += f"<p><b>Plots with Above-Average Numbers of Labelled Genes per Maximal Genomic Neighbourhood (Highest to Lowest):</b></p>"
         section_string += "<ul>"
         for file in above_score_plots:
-            section_string += f"<li><a href=/read_file?path={file['path']}>{file['filename']}</a>"
+            section_string += f"<li><a href=/read_file?path={file['path']}>{file['filename']}</a> ({score * 100:.2f}%)</li>"
         section_string += "</ul>"
     else:
         section_string += "<p><b>No plots found with above-average numbers of labelled genes.</b></p>"
