@@ -32,6 +32,29 @@ index_file=''
 log_filename="log.txt"
 gnat_flag='false'
 
+# Logging Function
+log_msg() {
+  local tag="$1"
+  local msg="$2"
+  local file="$3"
+
+  echo "[ ${tag} ] ${msg}"
+
+  if [ -n "$file" ]; then
+    echo "${msg}" >> "$file"
+  fi
+}
+
+# Convert MS to Human Readable
+hr_time() {
+  local ms="$1"
+  local sec=$((ms / 1000))
+  date -d "@$sec" "+%b %d %H:%M:%S"
+}
+
+# Error Catching Function
+
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -169,7 +192,7 @@ if [ "$gnat_flag" == 'false' ]; then
 
   # Check if outdir exists, if so, exit
   if [ -d "$outdir" ]; then
-    echo "[ $out_tag ] Error: directory $outdir exists. Specify a different -ot or -ol. Exiting...";
+    log_msg "$out_tag" "Error: directory $outdir exists. Specify a different -ot or -ol. Exiting...";
     exit 1;
   fi
 
@@ -180,7 +203,7 @@ else
   outdir="$out_location"/"$out_tag"
 
   if [ ! -d "$outdir" ]; then
-    echo "[ $out_tag ] Error: job directory $outdir doesn't exist. This shouldn't be possible..."
+    log_msg "$out_tag" "Error: job directory $outdir doesn't exist. This shouldn't be possible..."
     exit 1;
   fi
 
@@ -200,34 +223,34 @@ if [ ! -f "$logfile" ]; then
   echo "Running pipeline..." > "$logfile"
 fi
 
-echo "[ $out_tag ] Starting..."
-echo "Starting..." > "$logfile"
+# Now that log file is set up, can use the logging function
+log_msg "$out_tag" "Starting..." "$logfile"
 
 # Get the start time in ms
 start_time=$(date +%s%3N)
-echo "[ $out_tag ] Start: $start_time"
+log_msg "$out_tag" "Start: $(hr_time "$start_time")" "$logfile" 
 
 curr_dir=$(pwd)
 # Check that required arguments were provided
 if [ -z ${query_file+x} ]; then
   if [ -z ${psiblast_out_file+x} ]; then
-    echo "Error: Must specify either [-q][--query_file] or [-p][--psiblast_out_file]."
+    log_msg "$out_tag" "Error: Must specify either [-q][--query_file] or [-p][--psiblast_out_file]." "$logfile"
     exit 1
   fi
 else
   if [ ! -z ${psiblast_out_file+x} ]; then
-    echo "Error: Only one of [-q][--query_file] and [-p][--psiblast_out_file] may be specified."
+    log_msg "$out_tag" "Error: Only one of [-q][--query_file] and [-p][--psiblast_out_file] may be specified." "$logfile"
     exit 1
   fi
 fi
 if [ -z ${database+x} ]; then
-  echo "Required argument [-d][--database] not specified."
+  log_msg "$out_tag" "Required argument [-d][--database] not specified." "$logfile"
   exit 1
 fi
 
 # Check if scripts were specified, if not, assume in PATH
 if [ -z ${script_dir+x} ]; then
-  echo "[-s][--scripts] not specified. Assuming scripts have been added to PATH."
+  log_msg "$out_tag" "[-s][--scripts] not specified. Assuming scripts have been added to PATH."
   script_dir=""
 else
   script_dir=$(cd "$script_dir" || exit; pwd; cd "$curr_dir" || exit;)
@@ -235,15 +258,15 @@ else
 fi
 
 # Make sure paths are absolute, find necessary database directories
-echo "[ $out_tag ] Checking paths..."
+log_msg "$out_tag" "Verifying paths..." "$log_file"
 database_root=$(cd "$database"/ || exit; pwd; cd "$curr_dir" || exit)
 org_name_db=$(basename "$database")
 org_name="${org_name_db%_db}"
 
 database=$(cd "$database_root"/"$org_name"db || exit; pwd; cd "$curr_dir" || exit)
-echo "[ $out_tag ] BlastDB found!"
+log_msg "$out_tag" "BlastDB found!"
 gbff=$(cd "$database_root"/"$org_name"_genomes/gbff || exit; pwd; cd "$curr_dir" || exit)
-echo "[ $out_tag ] GBFFs found!"
+log_msg "$out_tag" "GBFFs found!"
 
 # Check if an index file was provided, if so, verify it (and its corresponding label file) exist
 if [ ! -z "${index_file+x}" ] && [ -n "$index_file" ]; then
@@ -257,17 +280,17 @@ if [ ! -z "${index_file+x}" ] && [ -n "$index_file" ]; then
   # Verify they exist
   if [ ! -f "$index_file" ]; then
     if [ ! -f "$index_label_file" ]; then
-      echo "[ $out_tag ] Warning: Index file $index_file and label file $index_label_file do not exist. Not using an index file."
+      log_msg "$out_tag" "Warning: Index file $index_file and label file $index_label_file do not exist. Not using an index file."
       index_file=""
       index_label_file=""
     else
-      echo "[ $out_tag ] Warning: Index file $index_file does not exist. Not using an index file."
+      log_msg "$out_tag" "Warning: Index file $index_file does not exist. Not using an index file."
       index_file=""
       index_label_file=""
     fi
   else
     if [ ! -f "$index_label_file" ]; then
-      echo "[ $out_tag ] Warning: Index label file $index_label_file does not exist. Not using an index file."
+      log_msg "$out_tag" "Warning: Index label file $index_label_file does not exist. Not using an index file."
 
       index_file=""
       index_label_file=""
@@ -295,17 +318,14 @@ if [ ! -z ${query_file+x} ]; then
     query_file="$outdir"/"$(basename $query_file)"
   fi
 
-  echo "[ $out_tag ] Query file: $(basename $query_file)"
-  echo "Query file: $(basename $query_file)" >> "$logfile"
-  echo "[ $out_tag ] Running PSI-BLASTs"
-  echo "Running PSI-BLASTs" >> "$logfile"
+  log_msg "$out_tag" "Query file: $(basename $query_file)" "$logfile"
+  log_msg "$out_tag" "Running PSI-BLASTs" "$logfile"
   "${script_dir}"run_psiblasts.sh "$database" "$query_file" "$evalue" "$num_iter" "$out_tag"
 
   psi_blast_finish_time=$(date +%s%3N)
 
-  echo "PSI-BLASTs finished in $((psi_blast_finish_time - start_time)) ms" >> "$logfile"
-  echo "[ $out_tag ] PSI-BLASTs finished: $psi_blast_finish_time"
-  echo "[ $out_tag ] Time to run PSI-BLASTs: $((psi_blast_finish_time - start_time)) ms"
+  log_msg "$out_tag" "PSI-BLASTs finished: ${hr_time "$psi_blast_finish_time"}" "$logfile"
+  log_msg "$out_tag" "Time to run PSI-BLASTs: $(( (psi_blast_finish_time - start_time) / 1000 )) s"  "$logfile"
 
   query_filename=$(basename "$query_file")
   psiblast_out_file="$outdir"/"${query_filename%.fasta}".out
@@ -330,22 +350,18 @@ if [ -z ${label_file_location+x} ];
 then
   # Make sure no label file already exists
   if [ -f "$out_tag".label ]; then
-    echo "Job failed" >> "$logfile"
-    echo "[ $out_tag ] Job failed"
-    echo "$out_tag.label already exists in output directory. Please specify a different label file location. Exiting..." >> "$logfile"
-    echo "[ $out_tag ] $out_tag.label already exists in output directory. Please specify a different label file location. Exiting..."
+    log_msg "$out_tag" "Job failed" "$logfile"
+    log_msg "$out_tag" "$out_tag.label already exists in output directory. Please specify a different label file location. Exiting..." "$logfile"
     exit 1
   else
-    echo "No label file specified, creating new $out_tag.label in output directory." >> "$logfile"
-    echo "[ $out_tag ] No label file specified, creating new $out_tag.label in output directory."
+    log_msg "$out_tag" "No label file specified, creating new $out_tag.label in output directory." "$logfile"
     touch "$out_tag".label
     label_file_location="$PWD/$out_tag.label"
   fi
 fi
 
 label_file_name=$(basename "$label_file_location")
-echo "Using $label_file_name as match gene labelling file." >> "$logfile"
-echo "[ $out_tag ] Using $label_file_name as match gene labelling file."
+log_msg "$out_tag" "Using $label_file_name as match gene labelling file." "$logfile"
 
 
 # # Now that pretty much all the user-inputs have been parsed, we'll split the input file (query or PSI-Out) into individual files based on the query accession(s)
@@ -354,8 +370,7 @@ echo "[ $out_tag ] Using $label_file_name as match gene labelling file."
 
 # Get relevant info from psiblast output (GBFF_NAME MATCH_ACCESSION QUERY_ACCESSION E_VALUE PID QUERY_LEN MATCH_LEN MATCH_LEN/QUERY_LEN)
 # Also updates the label file with new match data
-echo "Parsing PSI-BLAST output..." >> "$logfile"
-echo "[ $out_tag ] Parsing PSI-BLAST output..."
+log_msg "$out_tag" "Parsing PSI-BLAST output..." "$logfile"
 "${script_dir}"parse_psiblast_out.py "$psiblast_out_file"
 
 # For each .parsed file in the current directory, run modify_label_file.py to update the label file with new match data
@@ -364,10 +379,8 @@ parsed_directories=()
 
 # Check if a .parsed file was created
 if ! ls *.parsed 1> /dev/null 2>&1; then
-  echo "Job failed" >> "$logfile"
-  echo "[ $out_tag ] Job failed"
-  echo "No PSI-BLAST matches were found. Exiting..." >> "$logfile"
-  echo "[ $out_tag ] No PSI-BLAST matches were found. Exiting..."
+  log_msg "$out_tag" "Job failed" "$logfile"
+  log_msg "$out_tag" "No PSI-BLAST matches were found. Exiting..." "$logfile"
   exit 0
 fi
 
@@ -386,8 +399,8 @@ do
     mv "$file" "${filename%.parsed}"/
 
     # Generate genomic neighbourhoods for each file containing matches (and the .accessions files)
-    echo "Creating GNs for $file" >> "$logfile"
-    echo "[ $out_tag ] Creating GNs for $file"
+    log_msg "$out_tag" "Creating GNs for ${file}" "$logfile"
+
     "${script_dir}"build_gn.py "${filename%.parsed}"/"$file" -d "$gbff" -o "${filename%.parsed}"/ -n "$num_flanking_genes"
 
     parsed_directories=("${parsed_directories[@]}" "${filename%.parsed}")
@@ -396,12 +409,13 @@ done
 
 # Check if there are any matches after filtering, if not, exit.
 if [[ $num_matches -eq 0 ]]; then
-  echo "Job failed" >> "$logfile"
-  echo "[ $out_tag ] Job failed"
-  echo "No PSI-BLAST matches were found. Exiting..." >> "$logfile"
-  echo "[ $out_tag ] No PSI-BLAST matches were found. Exiting..."
+  log_msg "$out_tag" "Job failed" "$logfile"
+  log_msg "$out_tag" "No PSI-BLAST matches were found. Exiting..." "$logfile"
   exit 0
 fi
+
+# Init a blank file for the summary data
+touch "$outdir"/summary.json
 
 # Filter GNs based on size, PID, redundancy, kmer. Generate phylo data for each filtering step
 for dir in "${parsed_directories[@]}";
@@ -412,8 +426,7 @@ do
   # Generate phylo data for all of the GNs generated
   "${script_dir}"generate_krona_plot.py "$psiblast_out_file" -o "$dir"/all.krona.html --raw
 
-  echo "Filtering GNs for $dir and generating phylogeny data." >> "$logfile"
-  echo "[ $out_tag ] Filtering GNs for $dir and generating phylogeny data."
+  log_msg "$out_tag" "Filtering GNs for $dir and generating phylogeny data." "$logfile"
 
   # Remove redundants based on aa-seq
   "${script_dir}"redundancy.py "$dir"
@@ -462,8 +475,7 @@ do
         # "${script_dir}"find_clusters.py "$s" "$(basename "$s")" --max_genes $((2*"$num_flanking_genes"+1))
 
   # Run plotting on NR clusters
-  echo "Generating phylogeny data and clinker plots for all non-redundant clusters in $dir" >> "$logfile"
-  echo "[ $out_tag ] Generating phylogeny data and clinker plots for all non-redundant clusters in $dir"
+  log_msg "$out_tag" "Generating phylogeny data and clinker plots for all non-redundant clusters in $dir" "$logfile"
 
   if [[ $(ls "$dir"/all_non_redundants | wc -l) -gt 0 ]]; then
       for cluster_dir in "$dir"/all_non_redundants/*_cluster_*
@@ -511,8 +523,7 @@ do
 
       # If there are clusters, generate Krona and Clinker plots for each cluster
       if [[ $(ls "$s" | wc -l) -gt 0 ]]; then
-      echo "Generating Krona and Clinker plots for all clusters in $s" >> "$logfile"
-      echo "[ $out_tag ] Generating Krona and Clinker plots for all clusters in $s"
+      log_msg "$out_tag" "Generating Krona and Clinker plots for all clusters in $s" "$logfile"
 
       for cluster_dir in "$s"/*_cluster_*
         do
@@ -524,6 +535,7 @@ do
           fi
 
           "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location" -gf "$gnat_flag" -sm "$svg_map"
+          "${script_dir}"extract_clinker_plot_data.py "$cluster_dir"/"$(basename "$cluster_dir")".html -j "$out_tag" -q "${dir#${out_tag}_}" -i "$outdir"/summary.json
 
           mkdir "$cluster_dir"/genbank_files
           mv "$cluster_dir"/*.gb "$cluster_dir"/genbank_files
@@ -533,7 +545,14 @@ do
   done
 done
 
-echo "Output with out tag $out_tag" >> "$logfile"
-echo "[ $out_tag ] Output with out tag $out_tag"
-echo "Job finished" >> "$logfile"
-echo "[ $out_tag ] Job finished"
+for dir in "${parsed_directories[@]}"; do
+  # Get the query name from the dir name (try cut off the tag)
+  query_name="${dir##*${out_tag}_}"
+
+  log_msg "$out_tag" "Visualizing summary data for ${query_name}"  "$logfile"
+
+  "${script_dir}"plot_summary_data.py "${outdir}/summary.json" -q "$query_name" -o "${dir}/gnat_${query_name}_summary.html"
+done
+
+log_msg "$out_tag" "Output with out tag $out_tag" "$logfile"
+log_msg "$out_tag" "Job finished" "$logfile"
