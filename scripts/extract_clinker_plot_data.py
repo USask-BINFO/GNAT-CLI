@@ -207,7 +207,7 @@ def extract_plot_data(data, uid_group_map):
                 groups = uid_group_map[gene['uid']]
                 product = gene['names'].get('product', 'unannotated')
 
-                if not product or product.lower().startswith("uncharacterized") or product.lower().startswith("uncharacterised") or product.lower() == "hypothetical protein":
+                if not product or product.lower() == "hypothetical protein": # product.lower().startswith("uncharacterized") or product.lower().startswith("uncharacterised") or product.lower() == "hypothetical protein":
                     product = "unannotated"
 
                 if len(groups) > 0:
