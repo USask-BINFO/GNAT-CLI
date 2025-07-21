@@ -23,15 +23,6 @@ class LabelObject:
         """
         return len(self.accessions)
 
-    def _in_(self, accession):
-        """
-        Check if an accession is in the SortedList. (self.accessions)
-        If accession is not in the list, return False.
-        If accession is in the list, return True.
-        """
-        result = self.accessions.bisect_left([accession])
-        return result != len(self.accessions)
-
     def __contains__(self, accession):
         """
         Check if an accession is in the SortedList. (self.accessions)
