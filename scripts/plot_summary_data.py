@@ -237,13 +237,14 @@ def bar_chart(label_counts, title):
 
     return fig_to_svg(fig)
 
-def co_localized_heatmap(data, title, max_n=None, is_int=True):
+def co_localized_heatmap(data, title, max_n=None, is_int=True, axis_tag=""):
     """
     Generate a heatmap showing label-label or label-product co-localization numbers.
     :param data: A dict or nested dict containing the co-localization data.
     :param title: str title of plot
     :param max_n: For label-product co-localization, max number of products to keep for each label (the most frequent n).
     :param is_int: True for raw counts, False for Log10 counts
+    :param axis_tag: str to prepend to axis labels (e.g., "Tier 1" or "PSI-BLAST")
     return: SVG heatmap str
     """
     # Check if data is one or two layers
@@ -285,8 +286,8 @@ def co_localized_heatmap(data, title, max_n=None, is_int=True):
 
         width = max(10, 0.5 * len(all_products))
         height = max(8, 0.4 * len(all_labels))
-        xlabel = "Product"
-        ylabel = "Label"
+        xlabel = "NCBI Gene Annotations"
+        ylabel = f"{axis_tag} Gene Annotations"
         bar_label = "Number of Co-Occurrences"
         if is_int:
             bar_label += " (Raw Counts)"
@@ -338,8 +339,8 @@ def co_localized_heatmap(data, title, max_n=None, is_int=True):
 
         width = max(10, len(matrix.columns) * .5)
         height = max(8, len(matrix.index) * 0.4)
-        xlabel = "Label B"
-        ylabel = "Label A"
+
+        ylabel = xlabel = f"{axis_tag} Gene Annotations"
         bar_label = "Number of Co-Occurrences"
         if is_int:
             bar_label += " (Raw Counts)"
@@ -460,7 +461,7 @@ def make_query_section(query_data, num_flanking_genes=15):
         section_string += f"<p><b>Plots with Above-Average Numbers of Labelled Genes per Maximal Genomic Neighbourhood (Highest to Lowest):</b></p>"
         section_string += "<ul>"
         for file in above_score_plots:
-            section_string += f"<li><a href=/read_file?path={file['path']}>{file['filename']}</a> ({score * 100:.2f}%)</li>"
+            section_string += f"<li><a href=/read_file?path={file['path']}>{file['filename']}</a> ({file['score'] * 100:.2f}%)</li>"
         section_string += "</ul>"
     else:
         section_string += "<p><b>No plots found with above-average numbers of labelled genes.</b></p>"
@@ -488,13 +489,13 @@ def make_query_section(query_data, num_flanking_genes=15):
             max_products = 5
             section_string += f"<h3>{title}</h3>"
             section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
-            section_string += co_localized_heatmap(query_data['co_localized_psiblast_products'], title, max_n=max_products, is_int=True)
+            section_string += co_localized_heatmap(query_data['co_localized_psiblast_products'], title, max_n=max_products, is_int=True, axis_tag="PSI-BLAST")
 
             title = "Log10 " + title
             section_string += f"<h3>{title}</h3>"
             section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
             logged_data = log_data(query_data['co_localized_psiblast_products'])
-            section_string += co_localized_heatmap(logged_data, title, max_n=max_products, is_int=False)
+            section_string += co_localized_heatmap(logged_data, title, max_n=max_products, is_int=False, axis_tag="PSI-BLAST")
 
     # Tier Label Sections
     if query_data.get("num_labeled") and query_data['num_labeled'] > 0:
@@ -537,11 +538,11 @@ def make_query_section(query_data, num_flanking_genes=15):
             # Label Heatmap
             if tiered_labels_per_gn_unique_co_localized and tiered_labels_per_gn_unique_co_localized.get(tier):
                 title = f"Co-Occurrence Patterns Among Tier {tier} User-Annotated Genes"
-                section_string += co_localized_heatmap(tiered_labels_per_gn_unique_co_localized.get(tier), title, is_int=True)
+                section_string += co_localized_heatmap(tiered_labels_per_gn_unique_co_localized.get(tier), title, is_int=True, axis_tag=f"Tier {tier}")
 
                 logged_data = log_data(tiered_labels_per_gn_unique_co_localized.get(tier))
                 
-                section_string += co_localized_heatmap(logged_data, "Log10 " + title, is_int=False)
+                section_string += co_localized_heatmap(logged_data, "Log10 " + title, is_int=False, axis_tag=f"Tier {tier}")
 
             # Product Heatmap
             if tiered_co_localized_label_products and tiered_co_localized_label_products.get(tier):
@@ -550,34 +551,25 @@ def make_query_section(query_data, num_flanking_genes=15):
 
                 section_string += f"<h3>{title}</h3>"
                 section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
-                section_string += co_localized_heatmap(tiered_co_localized_label_products.get(tier), title, max_n=max_products, is_int=True)
+                section_string += co_localized_heatmap(tiered_co_localized_label_products.get(tier), title, max_n=max_products, is_int=True, axis_tag=f"Tier {tier}")
 
                 title = "Log10 " + title
                 section_string += f"<h3>{title}</h3>"
                 section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
                 logged_data = log_data(tiered_co_localized_label_products.get(tier))
-                section_string += co_localized_heatmap(logged_data, title, max_n=max_products, is_int=False)
+                section_string += co_localized_heatmap(logged_data, title, max_n=max_products, is_int=False, axis_tag=f"Tier {tier}")
 
     return section_string
 
 
-def write_full_report(query_sections, outfile):
+def write_full_report(query_sections, query_names, outfile):
     """
     Writes the final HTML report by adding header info and joining provided sections. If len(query_sections) == 1, removes overall header and formats for a single query name.
     :param query_sections: List of the HTML for each query name.
+    :param query_names: List of str names of the queries (in same order as query_sections).
     :param outfile: The location and name of the file to write to.
     return: None, writes to outfile
     """
-    query_names = []
-
-    for section in query_sections:
-        query_name = section.split('\n')[0]
-        query_name = query_name.split('>')[1]
-        query_name = query_name.split('<')[0]
-
-        query_name = query_name.split()[-1]
-        query_names.append(query_name)
-        
 
     outstr = """
     <html>
@@ -593,6 +585,10 @@ def write_full_report(query_sections, outfile):
 
     else:
         outstr += f"GNAT Output Summary for all Job Queries</h1>"
+
+    outstr += "<p>Any figure (other than sunburst plots) may be clicked on to download the SVG. To download the sunburst plot, hover over it and click on the camera button to download a PNG.</p>"
+
+    outstr += "<p>For help interpreting the figures in this report, click <a target='_blank' href='https://gnat-dev.usask.ca/report_help'>here</a>.</p>"
 
     for i, query_section in enumerate(query_sections):
         if len(query_names) != 1:
@@ -689,19 +685,21 @@ if __name__ == "__main__":
     # Check if provided query is in the JSON
     if provided_query and provided_query not in summary_json['query_names'].keys():
         print(f"Warning: Provided query name {provided_query} not found in the summary JSON. Generating visualization using all query names.")
-
         provided_query = None
 
     if provided_query:
         # If provided query is in the JSON, build the summary for just that query
+        query_names = [provided_query]
         query_section = make_query_section(summary_json['query_names'][provided_query], num_flanking_genes=flanking)
-        write_full_report([query_section], outfile)
+        write_full_report([query_section], query_names, outfile)
 
     else:
         # Build for all queries
         query_sections = []
+        query_names = []
 
         for query_name in summary_json['query_names']:
+            query_names.append(query_name)
             query_sections.append(make_query_section(summary_json['query_names'][query_name], num_flanking_genes=flanking))
 
-        write_full_report(query_sections, outfile)
+        write_full_report(query_sections, query_names, outfile)
