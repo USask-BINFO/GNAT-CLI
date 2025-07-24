@@ -1,4 +1,7 @@
 #! /usr/bin/env python
+
+# DEPRECATED. Was used to draw representations of GN plots based on avg orientation.
+
 import svgwrite
 
 def create_forward_marker(dwg, x, y, width, height, colour):

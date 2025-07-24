@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 """
 Script to pull taxonomy data from a list of GNs, and generate phylogenetic trees and pie charts from that data.
+DEPRECATED
 """
 
 import argparse
