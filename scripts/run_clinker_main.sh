@@ -2,6 +2,9 @@
 
 # Script to run clinker/main.py from main.sh without adding scripts/clinker to $PATH
 
+# Error catching
+source "$(dirname "$0")/utils.sh"
+
 POSITIONAL_ARGS=()
 GENERATE_SVG="false"
 
@@ -55,7 +58,7 @@ if [[ ${#POSITIONAL_ARGS[@]} -lt 1 ]]; then
   exit 1
 fi
 
-python "$(echo "${BASH_SOURCE[0]}" | rev | cut -d'/' -f2- | rev)"/clinker/main.py "${POSITIONAL_ARGS[@]}" -p "$PLOTNAME" -lf "$LABELFILE"
+run_catch python "$(echo "${BASH_SOURCE[0]}" | rev | cut -d'/' -f2- | rev)"/clinker/main.py "${POSITIONAL_ARGS[@]}" -p "$PLOTNAME" -lf "$LABELFILE"
 
 # If -gf == 'true' then generate the svg of the plot
 if [[ "$GENERATE_SVG" == "true" ]]; then
@@ -73,7 +76,7 @@ if [[ "$GENERATE_SVG" == "true" ]]; then
   fi
 
   # Generate the SVG file
-  /home/njt694/.nvm/versions/node/v20.19.2/bin/node "$svg_script" "$PLOTNAME"
+  run_catch /home/njt694/.nvm/versions/node/v20.19.2/bin/node "$svg_script" "$PLOTNAME"
 
   # Add the mapping of the SVG location to the Clinker plot location (if SVG_MAP_FILE is provided)
   if [[ -n "$SVG_MAP_FILE" ]]; then
