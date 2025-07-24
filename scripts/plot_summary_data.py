@@ -28,6 +28,9 @@ def fig_to_svg(fig, width_pct='50'):
     """
     f = StringIO()
     fig.tight_layout()
+
+    # Make font sizes consistent
+
     fig.savefig(f, format='svg', bbox_inches='tight')
     svg = f.getvalue()
 
@@ -241,7 +244,7 @@ def co_localized_heatmap(data, title, max_n=None, is_int=True, axis_tag=""):
     """
     Generate a heatmap showing label-label or label-product co-localization numbers.
     :param data: A dict or nested dict containing the co-localization data.
-    :param title: str title of plot
+    :param title: str title of the plot
     :param max_n: For label-product co-localization, max number of products to keep for each label (the most frequent n).
     :param is_int: True for raw counts, False for Log10 counts
     :param axis_tag: str to prepend to axis labels (e.g., "Tier 1" or "PSI-BLAST")
@@ -292,7 +295,7 @@ def co_localized_heatmap(data, title, max_n=None, is_int=True, axis_tag=""):
         if is_int:
             bar_label += " (Raw Counts)"
         else:
-            bar_label += " (Log10 Scale)"
+            bar_label += " (Log\u2081\u2080 Scale)"
 
     else:
         # Build symmetric label heatmap
@@ -345,7 +348,7 @@ def co_localized_heatmap(data, title, max_n=None, is_int=True, axis_tag=""):
         if is_int:
             bar_label += " (Raw Counts)"
         else:
-            bar_label += " (Log10 Scale)"
+            bar_label += " (Log\u2081\u2080 Scale)"
 
     fig, ax = plt.subplots(figsize=(width, height))
     sns.heatmap(matrix, cmap='Greens', annot=False, ax=ax, cbar_kws={'label': bar_label}, square=True)
@@ -355,12 +358,13 @@ def co_localized_heatmap(data, title, max_n=None, is_int=True, axis_tag=""):
     plt.yticks(rotation=0)
     return fig_to_svg(fig)
 
-def sunburst_plot(label_products, title, is_psiblast=False):
+def sunburst_plot(label_products, title, is_psiblast=False, equal_wedges=False):
     """
     Generates a sunburst plot mapping labels to their product annotation counts.
     :param label_products: Dict mapping str label_name to dict str product_annotation: int count
-    :param title: str plot title.
+    :param title: str title of the plot
     :param is_psiblast: Bool indicating if labels are from PSI-BLAST, if True doesn't try remove trailing tier # from label
+    :param equal_wedges: Bool indicating if wedges should be equally sized (defaults to proportional wedges based on counts)
     return: HTML for the sunburst plot
     """
     rows = []
@@ -374,10 +378,21 @@ def sunburst_plot(label_products, title, is_psiblast=False):
 
     df = pd.DataFrame(rows)
 
-    fig = pex.sunburst(df, path=["Label", "Product"], values="Count", width=700, height=700, title=title)
+    if equal_wedges:
+        fig = pex.sunburst(df, path=["Label", "Product"], width=700, height=700, title=title)
+    
+    else:
+        fig = pex.sunburst(df, path=["Label", "Product"], values="Count", width=700, height=700, title=title)
 
     # Uncomment to remove labels for sunburst plot (for figure)
     # fig.update_traces(textinfo='none')
+
+    # Make sure titles are consistent
+    fig.update_layout(
+        title_font=dict(color='black',
+                        size=14,
+                        family="sans-serif")
+    )
 
     return pio.to_html(fig, include_plotlyjs=False, full_html=False)
 
@@ -480,19 +495,20 @@ def make_query_section(query_data, num_flanking_genes=15):
         # Sunburst
         if query_data.get('psiblast_products'):
             title = "Summary of NCBI Product Annotations Linked to PSI-BLAST Labels"
-            section_string += f"<h3>{title}</h3>"
+            # section_string += f"<h3>{title}</h3>"
             section_string += sunburst_plot(query_data['psiblast_products'], title, is_psiblast=True)
 
         # Product heatmap
         if query_data.get('co_localized_psiblast_products'):
+            section_string += "<h3>NCBI Product Annotation Heatmaps</h3>"
             title = "NCBI Product Annotations Linked to PSI-BLAST Labels"
             max_products = 5
-            section_string += f"<h3>{title}</h3>"
+            # section_string += f"<h3>{title}</h3>"
             section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
             section_string += co_localized_heatmap(query_data['co_localized_psiblast_products'], title, max_n=max_products, is_int=True, axis_tag="PSI-BLAST")
 
-            title = "Log10 " + title
-            section_string += f"<h3>{title}</h3>"
+            title = "Log\u2081\u2080 " + title
+            # section_string += f"<h3>{title}</h3>"
             section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
             logged_data = log_data(query_data['co_localized_psiblast_products'])
             section_string += co_localized_heatmap(logged_data, title, max_n=max_products, is_int=False, axis_tag="PSI-BLAST")
@@ -533,29 +549,30 @@ def make_query_section(query_data, num_flanking_genes=15):
             
             # Sunburst
             if tiered_label_products and tiered_label_products.get(tier):
-                section_string += sunburst_plot(tiered_label_products.get(tier), f"Summary of NCBI Product Annotations Linked to User-Defined Labels: Tier {tier}", is_psiblast=False,)
+                section_string += sunburst_plot(tiered_label_products.get(tier), f"Summary of NCBI Product Annotations Linked\n to User-Defined Labels: Tier {tier}", is_psiblast=False,)
 
             # Label Heatmap
             if tiered_labels_per_gn_unique_co_localized and tiered_labels_per_gn_unique_co_localized.get(tier):
-                title = f"Co-Occurrence Patterns Among Tier {tier} User-Annotated Genes"
+                title = f"Co-Occurrence Patterns Among \nTier {tier} User-Annotated Genes"
                 section_string += co_localized_heatmap(tiered_labels_per_gn_unique_co_localized.get(tier), title, is_int=True, axis_tag=f"Tier {tier}")
 
                 logged_data = log_data(tiered_labels_per_gn_unique_co_localized.get(tier))
                 
-                section_string += co_localized_heatmap(logged_data, "Log10 " + title, is_int=False, axis_tag=f"Tier {tier}")
+                section_string += co_localized_heatmap(logged_data, "Log\u2081\u2080 " + title, is_int=False, axis_tag=f"Tier {tier}")
 
             # Product Heatmap
             if tiered_co_localized_label_products and tiered_co_localized_label_products.get(tier):
+                section_string += "<h3>NCBI Product Annotation Heatmaps</h3>"
                 title = f"NCBI Product Annotations Linked to Tier {tier} User-Defined Labels"
                 max_products = 5
 
-                section_string += f"<h3>{title}</h3>"
+                # section_string += f"<h3>{title}</h3>"
                 section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
                 section_string += co_localized_heatmap(tiered_co_localized_label_products.get(tier), title, max_n=max_products, is_int=True, axis_tag=f"Tier {tier}")
 
-                title = "Log10 " + title
-                section_string += f"<h3>{title}</h3>"
-                section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
+                title = "Log\u2081\u2080 " + title
+                # section_string += f"<h3>{title}</h3>"
+                # section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
                 logged_data = log_data(tiered_co_localized_label_products.get(tier))
                 section_string += co_localized_heatmap(logged_data, title, max_n=max_products, is_int=False, axis_tag=f"Tier {tier}")
 
