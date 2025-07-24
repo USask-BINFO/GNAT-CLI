@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as pex
 import plotly.io as pio
-import base64
 from io import StringIO
 import pandas as pd
 from collections import Counter, defaultdict
@@ -16,10 +15,15 @@ import re
 from argparse import ArgumentParser
 from os import path
 
+# Imports for linear regression
+from sklearn.linear_model import LinearRegression
+from scipy.stats import norm
+from math import sqrt
+
 # --------------------------------------------
 # Helper functions
 # --------------------------------------------
-def fig_to_svg(fig, width_pct='50'):
+def fig_to_svg(fig, width_pct='45'):
     """
     Convert a matplotlib.pyplot figure to an SVG string.
     :param fig: A figure generated with matplotlib.pyplot (or another library that uses it). E.g., plt.figure()
@@ -39,7 +43,19 @@ def fig_to_svg(fig, width_pct='50'):
 
     svg = re.sub(r'^<svg', '<svg style="max-width: 100%; height: auto;"', svg, count=1)
 
-    return f"<div style='width: {width_pct}%; cursor: pointer;' onclick='downloadSVG(this)'>{svg}</div>"
+    return f"<div class='hover-div' style='width: {width_pct}%; cursor: pointer;' onclick='downloadSVG(this)'>{svg}</div>"
+
+def side_by_side(*figs):
+    """
+    Puts the provided SVG/HTML str figs into a <div> arranged side-by-side.
+    :param figs: fig strs to put side by side
+    return: A str div containing the provided figs arranged side by side
+    """
+    div_str = "<div style='display: flex; flex-direction: row; justify-content: space-evenly; flex-wrap: wrap;'>"
+    for fig in figs:
+        div_str += fig
+    div_str += "</div>"
+    return div_str
 
 def sort_plots(plot_list):
     """
@@ -157,6 +173,59 @@ def split_by_tier(data, levels=1, semicolon=False):
         
         return mapped
 
+def linear_regression(query_data):
+    """
+    Performs a linear regression on the query plot data (x1: # GNs, x2: total # genes, y: # labelled genes) to predict labelled genes 
+    from the number of GNs and the total number of genes in a plot. Then calculates the residuals for the plot data and p-values for 
+    those residuals. Returns a pandas dataframe with all the information. Used to find plots with more labelled genes than expected.
+    :param query_data: The contents of a given 'query_name' subdict in the summary data JSON (e.g., data['query_names'][query_name_0]).
+    return: Tuple containing: (A pandas dataframe with the following headers: 'path', 'total', 'gns', 'labelled', 'residuals', 'z_scores', and 'p_values', A dict containing the intercept, coefficients, and R squared for the model fit)
+    """
+    total, gns, labelled, path = [], [], [], []
+
+    if query_data.get('plot_paths'):
+        for plot_dict in query_data['plot_paths']:
+            counts = plot_dict['counts']
+            t, l, g = counts[0], counts[1], counts[2]
+
+            total.append(t)
+            gns.append(g)
+            labelled.append(l)
+            path.append(plot_dict['path'])
+
+    df = pd.DataFrame({'path': path, 'total': total, 'gns': gns, 'labelled': labelled})
+
+    model = LinearRegression()
+
+    X, y = df[['total', 'gns']], df.labelled
+
+    model.fit(X, y)
+
+    model_data = {'intercept': model.intercept_, 'coefficients': model.coef_, 'r_square': model.score(X,y)}
+
+    pred = model.predict(X)
+    residuals = y - pred
+
+    df['residuals'] = residuals
+
+    # Get the Z score of the residuals (to get the p-values)
+    # Z score: X - mean / stdev
+    # The mean of the residuals should be approx. == 0 (since there should be an equal number above and below the linear regression line)
+    # So Z score: X / stdev
+
+    # stdev is sqrt(var)
+    # var is (1/N) * sum((X-mean)^2) ==> (1/N) * sum(X^2)
+
+    squared_res = residuals ** 2
+    variance = (1/len(residuals)) * sum(squared_res)
+    stdev = sqrt(variance)
+
+    Z = residuals / stdev
+
+    df['z_scores'] = Z
+    df['p_values'] = 1 - norm.cdf(Z) # One tailed since we only care about plots with more labelled genes than expected
+
+    return df, model_data
 
 # --------------------------------------------
 # Plot functions
@@ -214,7 +283,7 @@ def percent_labelled_pie(query_data):
 
     ax.set_title("Percentage (%) of Genes Annotated")
 
-    return fig_to_svg(fig)
+    return fig_to_svg(fig, width_pct='22.5')
 
 def bar_chart(label_counts, title):
     """
@@ -422,11 +491,8 @@ def make_query_section(query_data, num_flanking_genes=15):
     {query_data['num_both']} Genes Annotated Using Both User-Defined Labels and PSI-BLAST Results
     </pre>"""
 
-    # Box and whisker plots
-    section_string += box_and_whisker_plots(query_data)
-
-    # Pie chart
-    section_string += percent_labelled_pie(query_data)
+    # Box and whisker plots & pie chart side-by-side
+    section_string += side_by_side(box_and_whisker_plots(query_data), percent_labelled_pie(query_data))
 
     # Labelling averages
     total_genes = query_data['num_genes']
@@ -445,73 +511,61 @@ def make_query_section(query_data, num_flanking_genes=15):
 
     section_string += f"<p><b>Percentage (%) of Genes Annotated: {average_labels_per_gene * 100:.0f}%</b></p>"
     section_string += f"<p><b>Average Number of Annotated Genes per Genomic Neighbourhood: {average_labels_per_gn:.2f}</b></p>"
-    section_string += f"<p><b>Percentage (%) of Annotated Genes per Maximal Genomic Neighbourhood: {(total_labelled / (total_gns * max_width)) * 100:.0f}%</b></p>"
 
-    job_score = total_labelled / (total_gns * max_width)
+    linear_regression_df, linear_regression_data = linear_regression(query_data)
 
-    # Above average plots
-    above_score_plots = []
+    # Use a p-value cutoff of 0.15 (there aren't usually huge outliers so 0.05 rarely has a single plot, 0.15 looks like it gives a decent number of plots with interesting labels)
+    highly_labelled_plots = linear_regression_df[linear_regression_df['p_values'] <= 0.15].sort_values('p_values', ascending=True)
 
-    for plot_data in query_data['plot_paths']:
-        path = plot_data['path']
-        total, labelled, gns = plot_data['counts']
-        total, labelled, gns = int(total), int(labelled), int(gns)
-
-        if gns == 0:
-            # Avoid divide by 0 (shouldn't be possible)
-            print(f"WARNING: Plot {path} appears to have 0 genes.")
-            continue
-
-        score = labelled / (gns * max_width)
-
-        if score > job_score:
-            filename = path.rsplit('/', 1)
-            if len(filename) != 2:
-                continue
-            else:
-                above_score_plots.append({"filename": filename[1], "path": path, "score": score})
-    
-    if len(above_score_plots) > 0:
-        above_score_plots = sort_plots(above_score_plots)
-        section_string += f"<p><b>Plots with Above-Average Numbers of Labelled Genes per Maximal Genomic Neighbourhood (Highest to Lowest):</b></p>"
+    if len(highly_labelled_plots) > 0:
+        section_string += "<p><b>Plots with More Labelled Genes than Expected (p-value <= 0.15)</b></p>"
         section_string += "<ul>"
-        for file in above_score_plots:
-            section_string += f"<li><a href=/read_file?path={file['path']}>{file['filename']}</a> ({file['score'] * 100:.2f}%)</li>"
+        section_string += "<p>p-value: Plot Name</p>"
+
+        for row in highly_labelled_plots.itertuples(index=False):
+            section_string += f"<li>{row.p_values:.2f}: <a href=/read_file?path={row.path}>{row.path.split('/')[-1]}</a></li>"
+
         section_string += "</ul>"
     else:
-        section_string += "<p><b>No plots found with above-average numbers of labelled genes.</b></p>"
+        section_string += "<p><b>No plots found with more labelled genes than expected.</b></p>"
 
     # PSI-BLAST Section
     if query_data['num_psiblast'] > 0:
         section_string += "<h2>PSI-BLAST Annotations Summary</h2>"
 
         # Bar Charts
+        bars = []
         if query_data.get('psiblast_per_gn_unique'):
-            section_string += bar_chart(query_data['psiblast_per_gn_unique'], "Total Genomic Neighbourhoods with PSI-BLAST Annotations")
+            bars.append(bar_chart(query_data['psiblast_per_gn_unique'], "Total Genomic Neighbourhoods with PSI-BLAST Annotations"))
         
         if query_data.get('total_psiblast'):
-            section_string += bar_chart(query_data['total_psiblast'], "Total Genes with PSI-BLAST Annotations")
+            bars.append(bar_chart(query_data['total_psiblast'], "Total Genes with PSI-BLAST Annotations"))
+
+        if bars:
+            section_string += side_by_side(*bars)
 
         # Sunburst
         if query_data.get('psiblast_products'):
             title = "Summary of NCBI Product Annotations Linked to PSI-BLAST Labels"
             # section_string += f"<h3>{title}</h3>"
-            section_string += sunburst_plot(query_data['psiblast_products'], title, is_psiblast=True)
+            section_string += side_by_side(sunburst_plot(query_data['psiblast_products'], title, is_psiblast=True), sunburst_plot(query_data['psiblast_products'], title + " (equal wedges)", is_psiblast=True, equal_wedges=True))
 
         # Product heatmap
         if query_data.get('co_localized_psiblast_products'):
+            hmaps = []
             section_string += "<h3>NCBI Product Annotation Heatmaps</h3>"
             title = "NCBI Product Annotations Linked to PSI-BLAST Labels"
             max_products = 5
             # section_string += f"<h3>{title}</h3>"
             section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
-            section_string += co_localized_heatmap(query_data['co_localized_psiblast_products'], title, max_n=max_products, is_int=True, axis_tag="PSI-BLAST")
+            hmaps.append(co_localized_heatmap(query_data['co_localized_psiblast_products'], title, max_n=max_products, is_int=True, axis_tag="PSI-BLAST"))
 
             title = "Log\u2081\u2080 " + title
             # section_string += f"<h3>{title}</h3>"
-            section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
             logged_data = log_data(query_data['co_localized_psiblast_products'])
-            section_string += co_localized_heatmap(logged_data, title, max_n=max_products, is_int=False, axis_tag="PSI-BLAST")
+            hmaps.append(co_localized_heatmap(logged_data, title, max_n=max_products, is_int=False, axis_tag="PSI-BLAST"))
+
+            section_string += side_by_side(*hmaps)
 
     # Tier Label Sections
     if query_data.get("num_labeled") and query_data['num_labeled'] > 0:
@@ -542,39 +596,48 @@ def make_query_section(query_data, num_flanking_genes=15):
             section_string += f"<h2>Tier {tier} Summary</h2>"
 
             # Bar Charts
+            bars = []
             if tiered_labels_per_gn_unique and tiered_labels_per_gn_unique.get(tier):
-                section_string += bar_chart(tiered_labels_per_gn_unique.get(tier), f"Total Genomic Neighbourhoods with User-Defined Annotations: Tier {tier}")
+                bars.append(bar_chart(tiered_labels_per_gn_unique.get(tier), f"Total Genomic Neighbourhoods with User-Defined Annotations: Tier {tier}"))
             if tiered_total_labels and tiered_total_labels.get(tier):
-                section_string += bar_chart(tiered_total_labels.get(tier), f"Total Genes with User-Defined Annotations: Tier {tier}")
-            
+                bars.append(bar_chart(tiered_total_labels.get(tier), f"Total Genes with User-Defined Annotations: Tier {tier}"))
+            if bars:
+                section_string += side_by_side(*bars)
+
             # Sunburst
             if tiered_label_products and tiered_label_products.get(tier):
-                section_string += sunburst_plot(tiered_label_products.get(tier), f"Summary of NCBI Product Annotations Linked\n to User-Defined Labels: Tier {tier}", is_psiblast=False,)
+                section_string += side_by_side(sunburst_plot(tiered_label_products.get(tier), f"Summary of NCBI Product Annotations Linked\n to User-Defined Labels: Tier {tier}", is_psiblast=False), sunburst_plot(tiered_label_products.get(tier), f"Summary of NCBI Product Annotations Linked\n to User-Defined Labels: Tier {tier} (equal wedges)", is_psiblast=False, equal_wedges=True))
 
             # Label Heatmap
             if tiered_labels_per_gn_unique_co_localized and tiered_labels_per_gn_unique_co_localized.get(tier):
+                hmaps = []
                 title = f"Co-Occurrence Patterns Among \nTier {tier} User-Annotated Genes"
-                section_string += co_localized_heatmap(tiered_labels_per_gn_unique_co_localized.get(tier), title, is_int=True, axis_tag=f"Tier {tier}")
+                hmaps.append(co_localized_heatmap(tiered_labels_per_gn_unique_co_localized.get(tier), title, is_int=True, axis_tag=f"Tier {tier}"))
 
                 logged_data = log_data(tiered_labels_per_gn_unique_co_localized.get(tier))
                 
-                section_string += co_localized_heatmap(logged_data, "Log\u2081\u2080 " + title, is_int=False, axis_tag=f"Tier {tier}")
+                hmaps.append(co_localized_heatmap(logged_data, "Log\u2081\u2080 " + title, is_int=False, axis_tag=f"Tier {tier}"))
+
+                section_string += side_by_side(*hmaps)
 
             # Product Heatmap
             if tiered_co_localized_label_products and tiered_co_localized_label_products.get(tier):
+                hmaps = []
                 section_string += "<h3>NCBI Product Annotation Heatmaps</h3>"
                 title = f"NCBI Product Annotations Linked to Tier {tier} User-Defined Labels"
                 max_products = 5
 
                 # section_string += f"<h3>{title}</h3>"
                 section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
-                section_string += co_localized_heatmap(tiered_co_localized_label_products.get(tier), title, max_n=max_products, is_int=True, axis_tag=f"Tier {tier}")
+                hmaps.append(co_localized_heatmap(tiered_co_localized_label_products.get(tier), title, max_n=max_products, is_int=True, axis_tag=f"Tier {tier}"))
 
                 title = "Log\u2081\u2080 " + title
                 # section_string += f"<h3>{title}</h3>"
                 # section_string += f"<p>Retaining only the top {max_products} products from each label.</p>"
                 logged_data = log_data(tiered_co_localized_label_products.get(tier))
-                section_string += co_localized_heatmap(logged_data, title, max_n=max_products, is_int=False, axis_tag=f"Tier {tier}")
+                hmaps.append(co_localized_heatmap(logged_data, title, max_n=max_products, is_int=False, axis_tag=f"Tier {tier}"))
+
+                section_string += side_by_side(*hmaps)
 
     return section_string
 
@@ -589,10 +652,20 @@ def write_full_report(query_sections, query_names, outfile):
     """
 
     outstr = """
+    <!DOCTYPE html>
     <html>
     <head>
         <title>GNAT Summary Report</title>
         <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
+        <style>
+            .hover-div {
+                border: 2px solid transparent;
+            }
+
+            .hover-div:hover {
+                border: 2px solid #105938;
+            }
+        </style>
     </head>
     <body style="font-family: 'Open Sans', sans-serif; padding: 40px;">
         <h1>"""
