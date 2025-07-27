@@ -49,16 +49,19 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ "${PLOTNAME}" == "" ]; then
-  echo "[-p] not specified, exiting..."
+  echo "[-p] not specified, exiting..." >&2
   exit 1
 fi
 
 if [[ ${#POSITIONAL_ARGS[@]} -lt 1 ]]; then
-  echo "Less than one .gb file provided. Exiting..."
+  echo "Less than one .gb file provided. Exiting..." >&2
   exit 1
 fi
 
-run_catch python "$(echo "${BASH_SOURCE[0]}" | rev | cut -d'/' -f2- | rev)"/clinker/main.py "${POSITIONAL_ARGS[@]}" -p "$PLOTNAME" -lf "$LABELFILE"
+out_dir=$(dirname "$PLOTNAME")
+# echo "[ DEBUG ] ERROR OUTDIR: ${out_dir}"
+
+run_catch "$out_dir" python "$(echo "${BASH_SOURCE[0]}" | rev | cut -d'/' -f2- | rev)"/clinker/main.py "${POSITIONAL_ARGS[@]}" -p "$PLOTNAME" -lf "$LABELFILE"
 
 # If -gf == 'true' then generate the svg of the plot
 if [[ "$GENERATE_SVG" == "true" ]]; then
@@ -67,16 +70,16 @@ if [[ "$GENERATE_SVG" == "true" ]]; then
   svg_script="$script_dir"/../../node_tools/extract_svg.js
 
   if [[ ! -f "$svg_script" ]]; then
-    echo "SVG script not found at $svg_script"
+    echo "SVG script not found at $svg_script" >&2
     exit 1
   fi
   if [[ ! -f "$PLOTNAME" ]]; then
-    echo "Clinker plot file not found at $PLOTNAME"
+    echo "Clinker plot file not found at $PLOTNAME" >&2
     exit 1
   fi
 
   # Generate the SVG file
-  run_catch /home/njt694/.nvm/versions/node/v20.19.2/bin/node "$svg_script" "$PLOTNAME"
+  run_catch "$out_dir" /home/njt694/.nvm/versions/node/v20.19.2/bin/node "$svg_script" "$PLOTNAME"
 
   # Add the mapping of the SVG location to the Clinker plot location (if SVG_MAP_FILE is provided)
   if [[ -n "$SVG_MAP_FILE" ]]; then
@@ -85,7 +88,7 @@ if [[ "$GENERATE_SVG" == "true" ]]; then
     SVG_FILE="$(dirname "$PLOTNAME")/.${BASENAME}.svg"
 
     if [[ ! -f "$SVG_FILE" ]]; then
-      echo "SVG file not found at $SVG_FILE"
+      echo "SVG file not found at $SVG_FILE" >&2
       exit 1
     fi
 
