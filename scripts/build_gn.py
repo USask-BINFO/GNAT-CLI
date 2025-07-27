@@ -331,6 +331,9 @@ def find_cluster(genomename, accessionpos, n):
     Return: Genbank Record containing a certain number
     """
     # the path for opening the file must point to the directory holding genomes (.gbff.gz files)
+    if not path.exists(path.join(args.database, genomename)):
+        raise FileNotFoundError(f"GenBank file '{genomename}' does not exist in the provided database.")
+
     with gzip.open(path.join(args.database, genomename), "rt") as openedgenome:
         recordlist = SeqIO.parse(openedgenome, "gb")
         # use the parser to parse through the genbank record and the features of each record
