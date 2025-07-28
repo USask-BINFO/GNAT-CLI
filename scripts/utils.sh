@@ -5,10 +5,11 @@ run_catch() {
   local cmd="$2"
   shift 2
 
-  local err_file="${outdir}/.error.txt"
+  local my_err_file="${outdir}/.error.txt"
+  local user_err_file="${outdir}/error.txt"
 
   {
-    "$cmd" "$@" 2> >(tee -a "$err_file" >&2)
+    "$cmd" "$@" 2> >(tee -a "$my_err_file" >&2)
   }
 
   # echo "[ DEBUG utils.sh ] Contents of err_file: $(cat ${err_file})"
@@ -21,6 +22,7 @@ run_catch() {
     cmd_name="${cmd##*/}"
 
     echo "Job failed running ${cmd_name}" >&2
+    echo "Job failed running ${cmd_name}" >> "$user_err_file"
     # echo "Job failed running ${cmd_name}" >> "$err_file" # Looks like tee handles this now
     exit "$exit_code"
   fi
