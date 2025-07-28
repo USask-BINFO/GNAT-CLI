@@ -38,10 +38,41 @@ log_msg() {
   local msg="$2"
   local file="$3"
 
-  echo "[ ${tag} ] ${msg}"
+  echo_msg="$msg"
+
+  if [ -n "$tag" ]; then
+    echo_msg="[ ${tag} ] ${echo_msg}"
+  fi
+
+  echo "$echo_msg"
 
   if [ -n "$file" ]; then
-    echo "${msg}" >> "$file"
+    echo "[ $(date +%H:%M:%S) ] ${msg}" >> "$file"
+  fi
+}
+
+# Logging Function for Counter Updates
+log_counter() {
+  local tag="$1"
+  local msg_no_count="$2"
+  local file="$3"
+  local count="$4"
+  local total="$5"
+
+  local msg="[ ${tag} ] ${msg_no_count} (${count}/${total})"
+  local msg_log="[ $(date +%H:%M:%S) ] ${msg_no_count} (${count}/${total})"
+
+  # Journalctl does not handle '\r' well, so nothing printed here
+  # echo -ne "\r${msg}"
+
+  if [ -n "$file" ] && [ -f "$file" ]; then
+    last_line=$(tail -n 1 "$file")
+    if [[ "$last_line" == "[ "*" ] $msg_no_count"* ]]; then
+      # Remove last line and add new line
+      head -n -1 "$file" > "${file}.tmp" && echo "$msg_log" >> "${file}.tmp" && mv "${file}.tmp" "$file"
+    else
+      echo "$msg_log" >> "$file"
+    fi
   fi
 }
 
@@ -320,7 +351,7 @@ if [ ! -z ${query_file+x} ]; then
 
   log_msg "$out_tag" "Query file: $(basename $query_file)" "$logfile"
   log_msg "$out_tag" "Running PSI-BLASTs" "$logfile"
-  run_catch "${script_dir}"run_psiblasts.sh "$database" "$query_file" "$evalue" "$num_iter" "$out_tag"
+  run_catch "$outdir" "${script_dir}"run_psiblasts.sh "$database" "$query_file" "$evalue" "$num_iter" "$out_tag"
   psi_blast_finish_time=$(date +%s%3N)
 
   log_msg "$out_tag" "PSI-BLASTs finished: $(hr_time "$psi_blast_finish_time")" "$logfile"
@@ -370,7 +401,7 @@ log_msg "$out_tag" "Using $label_file_name as match gene labelling file." "$logf
 # Get relevant info from psiblast output (GBFF_NAME MATCH_ACCESSION QUERY_ACCESSION E_VALUE PID QUERY_LEN MATCH_LEN MATCH_LEN/QUERY_LEN)
 # Also updates the label file with new match data
 log_msg "$out_tag" "Parsing PSI-BLAST output..." "$logfile"
-run_catch "${script_dir}"parse_psiblast_out.py "$psiblast_out_file"
+run_catch "$outdir" "${script_dir}"parse_psiblast_out.py "$psiblast_out_file" -d "$gbff"
 
 # For each .parsed file in the current directory, run modify_label_file.py to update the label file with new match data
 num_matches=0
@@ -378,9 +409,17 @@ parsed_directories=()
 
 # Check if a .parsed file was created
 if ! ls *.parsed 1> /dev/null 2>&1; then
-  log_msg "$out_tag" "Job failed" "$logfile"
-  log_msg "$out_tag" "No PSI-BLAST matches were found. Exiting..." "$logfile"
-  exit 0
+  # err_file="${outdir}/.error.txt"
+  # log_msg "$out_tag" "Job failed" "$logfile" "$err_file"
+  # log_msg "$out_tag" "No PSI-BLAST matches were found." "$logfile" "$err_file"
+  # log_msg "$out_tag" "Job failed" "$logfile"
+  # log_msg "" "No PSI-BLAST matches were found. Exiting..." "$logfile"
+
+
+  log_msg "$out_tag" "No PSI-BLAST matches were found."
+
+  echo "No PSI-BLAST matches were found." >&2 # Send message to stderr for run_catch
+  exit 1
 fi
 
 for file in *.parsed
@@ -389,7 +428,7 @@ do
   (( num_matches += file_matches ))
 
   # Add parsed PSI-BLAST matches to the label file
-  run_catch "${script_dir}"modify_label_file.py "$label_file_location" -p "$file"
+  run_catch "$outdir" "${script_dir}"modify_label_file.py "$label_file_location" -p "$file"
 
   # Create a subdirectory for each parsed output file if it had matches
   if [[ "$file_matches" -gt 0 ]]; then
@@ -400,7 +439,7 @@ do
     # Generate genomic neighbourhoods for each file containing matches (and the .accessions files)
     log_msg "$out_tag" "Creating GNs for ${file}" "$logfile"
 
-    run_catch "${script_dir}"build_gn.py "${filename%.parsed}"/"$file" -d "$gbff" -o "${filename%.parsed}"/ -n "$num_flanking_genes"
+    run_catch "$outdir" "${script_dir}"build_gn.py "${filename%.parsed}"/"$file" -d "$gbff" -o "${filename%.parsed}"/ -n "$num_flanking_genes"
 
     parsed_directories=("${parsed_directories[@]}" "${filename%.parsed}")
   fi
@@ -408,9 +447,18 @@ done
 
 # Check if there are any matches after filtering, if not, exit.
 if [[ $num_matches -eq 0 ]]; then
-  log_msg "$out_tag" "Job failed" "$logfile"
-  log_msg "$out_tag" "No PSI-BLAST matches were found. Exiting..." "$logfile"
-  exit 0
+  # log_msg "" "Job failed" "$logfile"
+  # log_msg "" "No PSI-BLAST matches were found. Exiting..." "$logfile"
+
+  # log_msg "" "No PSI-BLAST matches were found." "${outdir}/.error.txt"
+  # err_file="${outdir}/.error.txt"
+  # log_msg "$out_tag" "Job failed" "$logfile" "$err_file"
+  # log_msg "$out_tag" "No PSI-BLAST matches were found." "$logfile" "$err_file"
+
+  log_msg "$out_tag" "No PSI-BLAST matches were found."
+
+  echo "No PSI-BLAST matches were found." >&2 # Send message to stderr for run_catch
+  exit 1
 fi
 
 # Init a blank file for the summary data
@@ -423,27 +471,31 @@ do
   parsed_psiblast_out_file=$(find "$dir" -name '*.parsed' -print -quit)
 
   # Generate phylo data for all of the GNs generated
-  run_catch "${script_dir}"generate_krona_plot.py "$psiblast_out_file" -o "$dir"/all.krona.html --raw
+  run_catch "$outdir" "${script_dir}"generate_krona_plot.py "$psiblast_out_file" -o "$dir"/all.krona.html --raw
 
   log_msg "$out_tag" "Filtering GNs for $dir and generating phylogeny data." "$logfile"
 
   # Remove redundants based on aa-seq
-  run_catch "${script_dir}"redundancy.py "$dir"
+  run_catch "$outdir" "${script_dir}"redundancy.py "$dir"
 
   # Get names of .gb files left in current directory
   gb_files=("$dir"/*.gb)
 
   if [ "${#gb_files[@]}" -gt 0 ]; then
+
+    log_msg "$out_tag" "Extracting all protein accessions from non-redundant GenBank files." "$logfile"
+
     # Generate the .accessions file for the NR gb files
     acc_file="$dir"/$(basename "$dir").accessions
     touch "$acc_file"
     echo '' > "$acc_file"
     for gb_file in "${gb_files[@]}"; do
       # Extract the accessions from the given file
-      run_catch "${script_dir}"extract_accessions.py "$gb_file" "$acc_file"
+      run_catch "$outdir" "${script_dir}"extract_accessions.py "$gb_file" "$acc_file"
     done
     # Generate phylo data for all the non-redundant GNs 
-    run_catch "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$dir"/all_non_redundants.krona.html
+    log_msg "$out_tag" "Visualizing phylogenetic data for the non-redundant genomic neighbourhoods." "$logfile"
+    run_catch "$outdir" "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" -g "${dir}" -o "$dir"/all_non_redundants.krona.html
   fi
 
   sort -u "$acc_file" -o "$acc_file"
@@ -452,15 +504,16 @@ do
   if [ -z "$index_file" -o -z "$index_label_file" ]; then
     :
   else
+    log_msg "$out_tag" "Finding matching protein accessions in label database." "$logfile"
     # Build a new subset label file from the accession lines in the indexed label file
     tmp_label_file="$dir"/"$label_file_name".tmp
     touch "$tmp_label_file"
     echo '' > "$tmp_label_file"
 
-    run_catch "${script_dir}"get_index_subset.py "$index_file" "$index_label_file" "$acc_file" "$tmp_label_file"
+    run_catch "$outdir" "${script_dir}"get_index_subset.py "$index_file" "$index_label_file" "$acc_file" "$tmp_label_file"
   
     # Merge the new tmp file into the LF
-    run_catch "${script_dir}"modify_label_file.py "$label_file_location" -l "$tmp_label_file"
+    run_catch "$outdir" "${script_dir}"modify_label_file.py "$label_file_location" -l "$tmp_label_file"
     rm "$tmp_label_file"
   fi
 
@@ -469,32 +522,40 @@ do
   cp "$dir"/*.gb "$dir"/all_non_redundants
 
   # Run clustering on NR directory
-  run_catch "${script_dir}"find_clusters.py "$dir"/all_non_redundants "$(basename "$dir" | cut -f1 -d ".")_non_redundant" --max_genes $((2*"$num_flanking_genes"+1))
+  log_msg "$out_tag" "Clustering non-redundant genomic neighbourhoods." "$logfile"
+  run_catch "$outdir" "${script_dir}"find_clusters.py "$dir"/all_non_redundants "$(basename "$dir" | cut -f1 -d ".")_non_redundant" --max_genes $((2*"$num_flanking_genes"+1))
 
-        # run_catch "${script_dir}"find_clusters.py "$s" "$(basename "$s")" --max_genes $((2*"$num_flanking_genes"+1))
+        # run_catch "$outdir" "${script_dir}"find_clusters.py "$s" "$(basename "$s")" --max_genes $((2*"$num_flanking_genes"+1))
 
   # Run plotting on NR clusters
-  log_msg "$out_tag" "Generating phylogeny data and clinker plots for all non-redundant clusters in $dir" "$logfile"
+  count=0
+  total=$(ls "$dir"/all_non_redundants | wc -l)
 
-  if [[ $(ls "$dir"/all_non_redundants | wc -l) -gt 0 ]]; then
+  if [[ "$total" -gt 0 ]]; then
+    log_msg "$out_tag" "Generating phylogeny distribution plots and genomic neighbourhood visualizations for all non-redundant clusters in '${dir##*/}'."
+    log_counter "$out_tag" "Generating phylogeny distribution plots and genomic neighbourhood visualizations for all non-redundant genomic neighbourhood clusters in '${dir##*/}'." "$logfile" "$count" "$total"
       for cluster_dir in "$dir"/all_non_redundants/*_cluster_*
         do
           # Generate phylo data and clinker plots for each cluster in all_non_redundants
           gb_files=("$cluster_dir"/*.gb)
 
           if [ "${#gb_files[@]}" -gt 0 ]; then
-            run_catch "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$cluster_dir"/all_non_redundants.krona.html
+            run_catch "$outdir" "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" -g "${cluster_dir}" -o "$cluster_dir"/all_non_redundants.krona.html
           fi
 
-          run_catch "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location" -gf "$gnat_flag" -sm "$svg_map"
+          run_catch "$outdir" "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location" -gf "$gnat_flag" -sm "$svg_map"
 
           mkdir "$cluster_dir"/genbank_files
           mv "$cluster_dir"/*.gb "$cluster_dir"/genbank_files
+
+          ((count++))
+          log_counter "$out_tag" "Generating phylogeny distribution plots and genomic neighbourhood visualizations for all non-redundant genomic neighbourhood clusters in '${dir##*/}'." "$logfile" "$count" "$total"
         done
   fi
 
+  log_msg "$out_tag" "Filtering genomic neighbourhoods with percent identity threshold." "$logfile"
   # Split GNs into two directories based on PID (threshold = 30%)
-  run_catch "${script_dir}"pid_filter.py "$dir"/"$dir".parsed -f "$dir" -t "$pid_threshold"
+  run_catch "$outdir" "${script_dir}"pid_filter.py "$dir"/"$dir".parsed -f "$dir" -t "$pid_threshold"
 
   for h in "$dir"/*PID*
   do
@@ -502,11 +563,13 @@ do
     gb_files=("$h"/*.gb)
 
     if [ "${#gb_files[@]}" -gt 0 ]; then
-      run_catch "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$h"/$(basename "$h").krona.html
+      log_msg "$out_tag" "Generating Krona phylogeny distribution plot for ${h}." "$logfile"
+      run_catch "$outdir" "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" -g "${h}" -o "$h"/$(basename "$h").krona.html
     fi
 
     # Split GNs into two directories based on size (within/outside 20% (default) query protein length)
-    run_catch "${script_dir}"size_filter.py "$dir"/"$dir".parsed -f "$h" -t "$length_threshold"
+    log_msg "$out_tag" "Filtering genomic neighbourhoods in ${h} with length threshold." "$logfile"
+    run_catch "$outdir" "${script_dir}"size_filter.py "$dir"/"$dir".parsed -f "$h" -t "$length_threshold"
 
     for s in "$h"/*size
     do
@@ -514,30 +577,39 @@ do
       gb_files=("$s"/*.gb)
 
       if [ "${#gb_files[@]}" -gt 0 ]; then
-        run_catch "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$s"/$(basename "$s").krona.html
+        log_msg "$out_tag" "Generating Krona phylogeny distribution plot for ${s}." "$logfile"
+        run_catch "$outdir" "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" -g "${s}" -o "$s"/$(basename "$s").krona.html
       fi
 
       # Generate kmer clusters (second argument is for first part of cluster dir name)
-      run_catch "${script_dir}"find_clusters.py "$s" "$(basename "$s")" --max_genes $((2*"$num_flanking_genes"+1))
+      log_msg "$out_tag" "Clustering genomic neighbourhoods in ${s}" "$logfile"
+      run_catch "$outdir" "${script_dir}"find_clusters.py "$s" "$(basename "$s")" --max_genes $((2*"$num_flanking_genes"+1))
 
       # If there are clusters, generate Krona and Clinker plots for each cluster
-      if [[ $(ls "$s" | wc -l) -gt 0 ]]; then
-      log_msg "$out_tag" "Generating Krona and Clinker plots for all clusters in $s" "$logfile"
+      count=0
+      total=$(ls "$dir"/all_non_redundants | wc -l)
 
+      if [[ $(ls "$s" | wc -l) -gt 0 ]]; then
+        log_msg "$out_tag" "Generating phylogeny distribution plots and genomic neighbourhood visualizations for genomic neighbourhood clusters in '${s##*/}'."
+        log_counter "$out_tag" "Generating phylogeny distribution plots and genomic neighbourhood visualizations for genomic neighbourhood clusters in '${s##*/}'." "$logfile" "$count" "$total"
+      # log_msg "$out_tag" "Generating Krona and Clinker plots for all clusters in $s" "$logfile"
       for cluster_dir in "$s"/*_cluster_*
         do
           # Generate Krona and Clinker plots for each cluster
           gb_files=("$cluster_dir"/*.gb)
 
           if [ "${#gb_files[@]}" -gt 0 ]; then
-            run_catch "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" "${gb_files[*]}" -o "$cluster_dir"/$(basename "$cluster_dir").krona.html
+            run_catch "$outdir" "${script_dir}"generate_krona_plot.py "$parsed_psiblast_out_file" -g "${cluster_dir}" -o "$cluster_dir"/$(basename "$cluster_dir").krona.html
           fi
 
-          run_catch "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location" -gf "$gnat_flag" -sm "$svg_map"
-          run_catch "${script_dir}"extract_clinker_plot_data.py "$cluster_dir"/"$(basename "$cluster_dir")".html -j "$out_tag" -q "${dir#${out_tag}_}" -i "$outdir"/summary.json
+          run_catch "$outdir" "${script_dir}"run_clinker_main.sh "$cluster_dir"/*.gb -p "$cluster_dir"/"$(basename "$cluster_dir")".html -lf "$label_file_location" -gf "$gnat_flag" -sm "$svg_map"
+          run_catch "$outdir" "${script_dir}"extract_clinker_plot_data.py "$cluster_dir"/"$(basename "$cluster_dir")".html -j "$out_tag" -q "${dir#${out_tag}_}" -i "$outdir"/summary.json
 
           mkdir "$cluster_dir"/genbank_files
           mv "$cluster_dir"/*.gb "$cluster_dir"/genbank_files
+
+          ((count++))
+          log_counter "$out_tag" "Generating phylogeny distribution plots and genomic neighbourhood visualizations for genomic neighbourhood clusters in '${s##*/}'." "$logfile" "$count" "$total"
         done
       fi
     done
@@ -550,7 +622,7 @@ for dir in "${parsed_directories[@]}"; do
 
   log_msg "$out_tag" "Visualizing summary data for ${query_name}"  "$logfile"
 
-  run_catch "${script_dir}"plot_summary_data.py "${outdir}/summary.json" -q "$query_name" -o "${dir}/gnat_${query_name}_summary.html" -n "$num_flanking_genes"
+  run_catch "$outdir" "${script_dir}"plot_summary_data.py "${outdir}/summary.json" -q "$query_name" -o "${dir}/gnat_${query_name}_summary.html" -n "$num_flanking_genes"
 done
 
 log_msg "$out_tag" "Output with out tag $out_tag" "$logfile"
