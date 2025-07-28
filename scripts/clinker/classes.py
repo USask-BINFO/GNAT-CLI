@@ -17,6 +17,7 @@ import gffutils
 from gffutils import biopython_integration
 
 from Bio import SeqIO, SeqRecord, BiopythonParserWarning
+from Bio.Seq import Seq
 from Bio.SeqFeature import FeatureLocation
 
 # ignore malformed locus warnings
@@ -609,6 +610,10 @@ class Gene(Serializer):
             for k, v in feature.qualifiers.items()
         }
         sequence = feature.extract(record.seq)
+
+        while len(sequence) % 3 != 0:
+            sequence += Seq("N")
+
         translation = qualifiers.pop("translation", sequence.translate())
         return cls(
             names=qualifiers,
