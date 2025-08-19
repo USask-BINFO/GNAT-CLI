@@ -61,12 +61,12 @@ for i in range(len(lines)):
         name = existing.split("/")[-1][:-3]
         potentially_existing_filename = path.join(existing, name+"_genomes", "gbff", filename)
     else:
-        potentially_existing_filename = "/not/a/a/rea/patha/adf/at"
+        potentially_existing_filename = None
 
     if path.isfile(potentially_existing_filename):
         pass
         #print(url)
-        #print(url + "\t" + str(i) + "\t" + lines[i])
+        # print(url + "\t" + str(i) + "\t" + lines[i])
     else:
         print(url)
 
