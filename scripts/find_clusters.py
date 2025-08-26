@@ -153,6 +153,11 @@ class Cluster:
             else:
                 good.append(clusters[i])
 
+        # print(f"[ DEBUG ] Evaluating clusters... Small: {len(small)}; Large: {len(large)}; Good: {len(good)}")
+        # print(f"[ DEBUG ] Small cluster size: {[len(cluster) for cluster in small]}")
+        # print(f"[ DEBUG ] Large cluster size: {[len(cluster) for cluster in large]}")
+        # print(f"[ DEBUG ] Good cluster size: {[len(cluster) for cluster in good]}")
+
         return small, good, large
 
     def sub_matrix(self, cluster_indices):
@@ -194,6 +199,7 @@ class Cluster:
         :param large_cluster: large cluster nested list desired to be removed
         return: No return, modifies param lists
         """
+        # print(f"[ DEBUG ] Breaking down large clusters... N: {len(large_cluster)} {[len(cluster) for cluster in large_cluster]}")
         while len(large_cluster) > 0:
             # Just take first element of large over and over, then append new larges to large
             l = large_cluster[0]
@@ -229,6 +235,7 @@ class Cluster:
         :param max_thresh: same as from evaluate_clusters()
         return: Nothing, changes contents of cluster list params
         """
+        # print(f"[ DEBUG ] Clumping small clusters... N: {len(small_cluster)}")
         new_small = []
         for cluster in small_cluster:
             for index in cluster:
@@ -266,13 +273,15 @@ class Cluster:
         while len(small_cluster) > 0:
             del small_cluster[0]    # Empty small cluster as its contents have been moved
 
-    def sized_clusters(self, min_thresh, max_thresh, desired_size=None):
+    def sized_clusters(self, min_thresh, max_thresh, desired_size=None, max_steps=250):
         """
         Generate clusters within a size threshold, used to generate clusters for plotting.
         :param min_thresh: Lower bound (inclusive) for desired cluster size.
         :param max_thresh: Upper bound (inclusive) for desired cluster size.
         :param desired_size: Optional: desired number of GNs in cluster. If not specified, takes midpoint of specified
                              range.
+        :param max_steps: Optional: maximum number of iterations to try break things into the right size, as it can
+                            get stuck in a loop sometimes. Default = 250.
         return: Best clusters within the range specified. (list of lists)
         """
         self.lower = min_thresh
@@ -290,9 +299,19 @@ class Cluster:
 
         small, good, large = self.evaluate_clusters(clusters, min_thresh, max_thresh)
 
-        while not (len(large) == 0) or not (len(small) == 0):
+        steps = 0
+
+        while not ((len(large) == 0) and (len(small) == 0)) and steps <= max_steps:
             self.break_down_large_clusters(small, good, large, n)
             self.clump_small_clusters(small, good, large, min_thresh, max_thresh)
+            steps += 1
+
+        if len(large) > 0: # Break down large even if they get too small, better too small than too large
+            self.break_down_large_clusters(small, good, large, n)
+
+        if len(small) > 0:
+            for s in range(len(small)):
+                good.append(small[s])
 
         return good
 
@@ -346,12 +365,14 @@ def main():
     if args.max_thresh <= 0 or args.min_thresh <= 0 or args.cluster_size <= 0:
         raise ValueError("[--max_thresh] (%i), [--min_thresh] (%i), and [-s][--cluster_size] (%i) must be positive.")
     
+    # print(f"[ DEBUG ] Starting clustering for directory {listdir(args.gn_dir)}")
     rawdir = listdir(args.gn_dir)
     gns_only = []
     for item in rawdir:
         if ".gb" in item:
             gns_only.append(item)
 
+    # print(f"[ DEBUG ] Num GNs: {len(gns_only)}")
     if len(gns_only) < 1:
         exit()
     elif len(gns_only) <= args.min_thresh:
@@ -359,9 +380,12 @@ def main():
         c = None
         clusters.append(gns_only)
     else:
+        # print(f"[ DEBUG ] Clustering...")
         # Generate clusters
         c = Cluster(args.gn_dir, k=args.k)
         clusters = c.sized_clusters(min_thresh=args.min_thresh, max_thresh=args.max_thresh, desired_size=args.cluster_size)
+
+    # print(f"[ DEBUG ] Done clustering. Calculating scores...")
 
     # Calculate a score and the 'average' GN for each cluster to determine the ordering of the cluster directories
     cluster_scores = []
