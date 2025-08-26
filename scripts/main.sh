@@ -83,6 +83,16 @@ hr_time() {
   date -d "@$sec" "+%b %d %H:%M:%S"
 }
 
+check_loop() {
+  local glob="$1"
+
+  if [ ! -e "$glob" ]; then
+    log_msg "$out_tag" "Warning: Glob $1 did not expand. Skipping loop." "$logfile"
+    return 1
+  fi
+  return 0
+}
+
 # Error Catching Function
 source "$(dirname "$0")/utils.sh"
 
@@ -424,6 +434,10 @@ fi
 
 for file in *.parsed
 do
+  if ! check_loop "$file"; then
+    continue
+  fi
+
   file_matches=$(cat "$file" | wc -l)
   (( num_matches += file_matches ))
 
@@ -467,6 +481,9 @@ touch "$outdir"/summary.json
 # Filter GNs based on size, PID, redundancy, kmer. Generate phylo data for each filtering step
 for dir in "${parsed_directories[@]}";
 do
+  if ! check_loop "$dir"; then
+    continue
+  fi
   # Get the name of the parsed psiblast output file (only one per $dir)
   parsed_psiblast_out_file=$(find "$dir" -name '*.parsed' -print -quit)
 
@@ -490,6 +507,9 @@ do
     touch "$acc_file"
     echo '' > "$acc_file"
     for gb_file in "${gb_files[@]}"; do
+      if ! check_loop "$gb_file"; then
+        continue
+      fi
       # Extract the accessions from the given file
       run_catch "$outdir" "${script_dir}"extract_accessions.py "$gb_file" "$acc_file"
     done
@@ -536,6 +556,9 @@ do
     log_counter "$out_tag" "Generating phylogeny distribution plots and genomic neighbourhood visualizations for all non-redundant genomic neighbourhood clusters in '${dir##*/}'." "$logfile" "$count" "$total"
       for cluster_dir in "$dir"/all_non_redundants/*_cluster_*
         do
+          if ! check_loop "$cluster_dir"; then
+            continue
+          fi
           # Generate phylo data and clinker plots for each cluster in all_non_redundants
           gb_files=("$cluster_dir"/*.gb)
 
@@ -559,6 +582,9 @@ do
 
   for h in "$dir"/*PID*
   do
+    if ! check_loop "$h"; then
+      continue
+    fi
     # Generate Krona plots for both PID filtered directories
     gb_files=("$h"/*.gb)
 
@@ -573,6 +599,9 @@ do
 
     for s in "$h"/*size
     do
+      if ! check_loop "$s"; then
+        continue
+      fi
       # Generate Krona plots for both size filtered directories
       gb_files=("$s"/*.gb)
 
@@ -595,6 +624,9 @@ do
       # log_msg "$out_tag" "Generating Krona and Clinker plots for all clusters in $s" "$logfile"
       for cluster_dir in "$s"/*_cluster_*
         do
+          if ! check_loop "$cluster_dir"; then
+            continue
+          fi
           # Generate Krona and Clinker plots for each cluster
           gb_files=("$cluster_dir"/*.gb)
 
@@ -617,6 +649,9 @@ do
 done
 
 for dir in "${parsed_directories[@]}"; do
+  if ! check_loop "$dir"; then
+    continue
+  fi
   # Get the query name from the dir name (try cut off the tag)
   query_name="${dir##*${out_tag}_}"
 
@@ -624,6 +659,9 @@ for dir in "${parsed_directories[@]}"; do
 
   run_catch "$outdir" "${script_dir}"plot_summary_data.py "${outdir}/summary.json" -q "$query_name" -o "${dir}/gnat_${query_name}_summary.html" -n "$num_flanking_genes"
 done
+
+# Now that everything's done, human-sort the svg map (with the non-redundants last) so the dashboard appears in a better order
+"${script_dir}"sort_svg_map.py "$svg_map"
 
 log_msg "$out_tag" "Output with out tag $out_tag" "$logfile"
 log_msg "$out_tag" "Job finished" "$logfile"
