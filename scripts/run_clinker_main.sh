@@ -92,11 +92,24 @@ if [[ "$GENERATE_SVG" == "true" ]]; then
       exit 1
     fi
 
+    # Try convert the SVG to PNG so large dashboards are more responsive
+    script_path="$(realpath "${BASH_SOURCE[0]}")"
+    script_dir="$(dirname "$script_path")"
+    run_catch "$out_dir" "${script_dir}/svg_to_png.py" "$SVG_FILE"
+
+    PNG_NAME="${SVG_FILE%.svg}.png"
+
+    if [[ -f "$PNG_NAME" ]]; then
+      MAPPED_FILE="$PNG_NAME"
+    else
+      MAPPED_FILE="$SVG_FILE"
+    fi
+
     MAP_DIR=$(dirname "$SVG_MAP_FILE");
 
-    REL_SVG_FILE=$(realpath --relative-to="$MAP_DIR" "$SVG_FILE");
+    REL_REP_FILE=$(realpath --relative-to="$MAP_DIR" "$MAPPED_FILE");
     REL_PLOTNAME=$(realpath --relative-to="$MAP_DIR" "$PLOTNAME");
 
-    echo "${REL_SVG_FILE}:${REL_PLOTNAME}" >> "$SVG_MAP_FILE";
+    echo "${REL_REP_FILE}:${REL_PLOTNAME}" >> "$SVG_MAP_FILE";
   fi
 fi
