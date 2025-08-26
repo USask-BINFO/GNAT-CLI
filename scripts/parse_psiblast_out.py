@@ -13,6 +13,7 @@ parser = argparse.ArgumentParser("Remove duplicated psi-BLAST matches and extrac
 # parser.add_argument("-m", "--master", help="Path to the master match file to update or create. If not specified, "
 #                                            "uses current directory.")
 parser.add_argument("psi_filename", help="Name of psi-BLAST output file to parse.")
+parser.add_argument("-d", "--database", help="Location of the GBFF subdirectory within the database provided to AcrVis.")
 # parser.add_argument("-o", "--out", help="Name of output file. If not specified, writes to stdout.")
 # Use psi filename + query name + .parsed for file names, output in current directory
 
