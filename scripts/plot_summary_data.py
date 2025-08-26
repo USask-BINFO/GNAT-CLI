@@ -101,7 +101,7 @@ def log_data(data):
             else:
                 single_data[k] = nan
 
-    if len(single_data) > 1:
+    if len(single_data) >= 1:
         return single_data
     else:
         return double_data
@@ -615,6 +615,14 @@ def make_query_section(query_data, num_flanking_genes=15):
                 hmaps.append(co_localized_heatmap(tiered_labels_per_gn_unique_co_localized.get(tier), title, is_int=True, axis_tag=f"Tier {tier}"))
 
                 logged_data = log_data(tiered_labels_per_gn_unique_co_localized.get(tier))
+
+                # print("DEBUG ===================================================================")
+                # print("DATA:")
+                # print(tiered_labels_per_gn_unique_co_localized.get(tier))
+                # print("LOGGED DATA:")
+                # print(logged_data)
+                # print("=========================================================================")
+
                 
                 hmaps.append(co_localized_heatmap(logged_data, "Log\u2081\u2080 " + title, is_int=False, axis_tag=f"Tier {tier}"))
 
