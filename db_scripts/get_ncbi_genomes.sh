@@ -124,7 +124,7 @@ MM_YYYY=$(date +%m_%Y)
 
 # Get list of new ncbi genomes (or all ncbi genomes if building from scratch)
 "${script_dir}"get_list_of_new_ncbi_genomes.py "$link" "$existing" | grep -v 'na/na' | sort | uniq > "${outdir}"/new_"${name}"_genomes_urls.txt
-
+# exit 0 # DEBUG
 # Make a directory to store the new downloaded genomes
 mkdir -p "${outdir}"/new_"${name}"_genomes_$$
 cd "${outdir}"/new_"${name}"_genomes_$$ || exit

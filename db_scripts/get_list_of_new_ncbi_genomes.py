@@ -63,9 +63,11 @@ for i in range(len(lines)):
     else:
         potentially_existing_filename = None
 
-    if path.isfile(potentially_existing_filename):
+    # print(potentially_existing_filename)
+
+    if potentially_existing_filename and path.isfile(potentially_existing_filename):
         pass
-        #print(url)
+        # print(url)
         # print(url + "\t" + str(i) + "\t" + lines[i])
     else:
         print(url)
