@@ -623,8 +623,25 @@ function plot(data) {
       // Display loading div
       document.getElementById('loading').style.display = 'block';
 
-      if (! labelTypes.has("dynamic_match")) {
+      let existingAccessionsLookup = {};
 
+      for (cluster of data.clusters) {
+        for (locus of cluster.loci) {
+          for (gene of locus.genes) {
+            if ('protein_id' in gene.names) {
+              let geneAcc = gene.names['protein_id'];
+              if (! (geneAcc in existingAccessionsLookup)) {
+                existingAccessionsLookup[geneAcc] = gene;
+              } else {
+                console.log("Warning: Gene accession '" + geneAcc + "' in the data object multiple times. Retaining only the first occurrence.");
+              }
+            }
+          }
+        }
+      }
+
+      if (! labelTypes.has("dynamic_match")) {
+        // Add dynamic options to dropdown menu
         labelTypes.add("dynamic_match");
         labelTypes.add("dynamic_short");
         labelTypes.add("dynamic_very_short");
@@ -647,114 +664,132 @@ function plot(data) {
         document.getElementById("select-label-type").appendChild(vshort)
       }
 
+      // ---------------------------- TODO: SHOULD CHECK IF EACH ACC IN THE LABEL FILE EXISTS IN THE PLOT BEFORE ADDING IT ----------------------------
       // Read the label file into a format with dict lookup (e.g., accession: [label, evalue, [class1, colour1, class2, colour2, ...]])
+      // By only keeping accs present in the plot we'll limit the size of the acc dict
       let fr = new FileReader();
       fr.onload=function(){
-        let accessions = {};
-        let isNew = false;
-        let header = "";
-        let startIdx = 0;
-        let class_names = null;
+        let dynamicAccessions = {};
+        let baseHeader = "#All_Accessions,Match_Label,Match_E_Value";
 
         let t = fr.result;
         let lines = t.split(/\r?\n/);
 
-        if (t[0] == "#") {
-          // New format (csv)
-          isNew = true;
-          header = lines[0].split(",");
-          startIdx = 1;
-
-          // Create an array of dictionaries to store the n class type dicts for each gene (where n is (len(splitLine) - 3 )/2)
-          class_names = [];
-
-          for (let i = 3; i < header.length; i+=2) {
-            class_names.push("Dynamic_" + header[i]);
-          }
-        } else if (lines[0].split("\t").length != 3) {
-          // Not a valid label file (not new format b/c no header, not old format b/c not 3 tsv columns)
-          alert("Invalid label file. Please ensure it is in the correct format.");
+        if (t.slice(0, baseHeader.length) != baseHeader) {
+          // File doesn't start with the valid baseHeader, display error and exit
+          alert("Error: First line of uploaded file does not begin with \"#All_Accessions,Match_Label,Match_E_Value\"");
+          console.log("Error: First line of uploaded file does not begin with \"#All_Accessions,Match_Label,Match_E_Value\"");
           document.getElementById("loading").style.display = 'none';
           return;
         }
 
-        for (let i = startIdx; i < lines.length; i++) {
-          if (isNew) {
-            // New format (csv, has header and >=3 columns)
-            let splitLine = lines[i].split(",");
-
-            let accession = splitLine[0];
-            let label = splitLine[1];
-            let evalue = splitLine[2];
-
-            // Make sure lineClasses has the right number of elements
-            while (splitLine.length < header.length) {
-              splitLine.push("");
-            }
-            
-            let lineClasses = splitLine.slice(3,);
-
-            // Check if the accession is already in the accessions dict (if it is, replace the old one if the e-value is lower)
-            if (accession in accessions) {
-              if (accessions[accession][1] > evalue) {
-                replaceDupe = true;
-                accessions[accession] = [label, evalue, lineClasses];
-              } else {
-                continue;
-              }
-            } else { // New accession, add the line
-              accessions[accession] = [label, evalue, lineClasses];
-            }
-          } else {
-            // Old format
-            let splitLine = lines[i].split("\t");
-
-            let accession = splitLine[0];
-            let label = splitLine[1];
-            let evalue = splitLine[2];
-
-            if (accession in accessions) {
-              if (accessions[accession][1] > evalue) {
-                accessions[accession] = [label, evalue];
-              }
-            } else {
-              accessions[accession] = [label, evalue];
-            }
-          } 
+        // Header begins with the valid base, add dynamic tier names to list
+        let header = lines[0].split(",");
+        let tierNames = [];
+        for (let i = 3; i < header.length; i++) {
+          tierNames.push("Dynamic_" + header[i]);
         }
 
-        // Build a label and colour map for each class column
+        for (let i = 1; i < lines.length; i++) { // Start at i = 1 to skip header line
+          let splitLine = lines[i].split(',');
+          if (splitLine.length < 3) {
+            console.log("Warning: Line at index '" + i.toString() + "' has length less than 3 (" + splitLine.length + ") when split on ','. Skipping...");
+          } else {
+            let accession = splitLine[0];
+            let label = splitLine[1];
+            let evalue = splitLine[2];
+
+            // Make sure the line length is the same as the header (shouldn't be necessary)
+            while (splitLine.length < header.length) {
+              console.log("Warning: Line at index '" + i.toString() + "' has less items than the header. Padding with ''...");
+              splitLine.push("");
+            }
+
+            let lineTiers = splitLine.slice(3,);
+
+            if (accession in dynamicAccessions) {
+              if (dynamicAccessions[accession][1] > evalue) { // Duplicate accession (shouldn't really happen), keep one with lower e-value
+                // If one doesn't have an e-value, but has tier labels, and the other has an e-value, but no tier labels, move the tier labels over to the new one
+                replaceDupe = true;
+                let existing = dynamicAccessions[accession];
+                let existingTiers = existing[2];
+
+                filledTiers = [];
+                for (let i=0; i < lineTiers.length; i++) {
+                  if (lineTiers[i]) {
+                    // lineTiers[i] is non-empty
+                    filledTiers.push(lineTiers[i]);
+                  } else if (! lineTiers[i] && existingTiers[i]) {
+                    // lineTiers[i] is "" and existingTiers[i] isn't ""
+                    filledTiers.push(existingTiers[i]);
+                  } else {
+                    // Both are empty
+                    filledTiers.push("");
+                  }
+                }
+
+                // Make sure lengths of filledTiers == existingTiers == lineTiers
+                if (! (filledTiers.length == existingTiers.length == lineTiers.length)) {
+                  console.log("Warning: Length of filledTiers (" + filledTiers.length + "), existingTiers (" + existingTiers.length + "), and lineTiers (" + lineTiers.length + ") do not match. Using lineTiers.");
+                  filledTiers = lineTiers;
+                }
+
+                dynamicAccessions[accession] = [label, evalue, filledTiers];
+              } else {
+                // Also check the tiers here
+                let existing = dynamicAccessions[accession];
+                let existingTiers = existing[2];
+
+                filledTiers = [];
+                for (let i=0; i < lineTiers.length; i++) {
+                  if (existingTiers[i]) {
+                    //existingTiers[i] is non-empty
+                    filledTiers.push(existingTiers[i]);
+                  } else if (! existingTiers[i] && lineTiers[i]) {
+                    // existingTiers[i] is "" and lineTiers[i] isn't ""
+                    filledTiers.push(lineTiers[i]);
+                  } else {
+                    // Both are emtpy
+                    filledTiers.push("");
+                  }
+                }
+
+                // Make sure lengths of filledTiers == existingTiers == lineTiers
+                if (! (filledTiers.length == existingTiers.length == lineTiers.length)) {
+                  console.log("Warning: Length of filledTiers (" + filledTiers.length + "), existingTiers (" + existingTiers.length + "), and lineTiers (" + lineTiers.length + ") do not match. Using existingTiers.");
+                  filledTiers = existingTiers;
+                }
+
+                dynamicAccessions[accession] = [existing[0], existing[1], filledTiers];
+                continue;
+              }
+            } else { // New accession, add line
+              dynamicAccessions[accession] = [label, evalue, lineTiers];
+            }
+          }
+        }
+
+        // Build a label map for each tier column
         let n_label_dict = [];
-        // let n_colour_map = [];
-        for (let i=0; i < class_names.length; i++) {
+
+        for (let i=0; i < tierNames.length; i++) {
           n_label_dict.push({});
-          // n_colour_map.push({});
         }
 
         // Loop through all the genes in the plot, and build the label dicts and colour maps (i.e., parse out the label file data for the genes present in the plot)
-        for (cluster of data.clusters) {
-          for (locus of cluster.loci) {
-            for (gene of locus.genes) {
-              // Check if the gene is in the label file
-              if ("protein_id" in gene.names) {
-                if (gene.names["protein_id"] in accessions) {
+        for (accession in existingAccessionsLookup) {
+          // Iterate over the keys (accessions) in the plot and check if they're in the label file
+          if (accession in dynamicAccessions) {
+            // Fill out the label map for each tier column
+            for (let i = 0; i < tierNames.length; i++) {
+              let tierLabel = dynamicAccessions[accession][2][i];
+              let tierColour = "";
 
-                  for (let i = 0; i < class_names.length; i++) {
-                    let groupLabel = accessions[gene.names["protein_id"]][2][i*2];
-                    let groupColour = accessions[gene.names["protein_id"]][2][i*2+1];
-
-                    if (!(groupColour != "" && groupColour != null && groupColour != " " && groupColour != "None" && groupColour[0] == "#")) {
-                      groupColour = "";
-                    }
-
-                    if (groupLabel != "" && groupLabel != null && groupLabel != " ") {
-                      if (groupLabel in n_label_dict[i]) {
-                        n_label_dict[i][groupLabel].push(gene.uid);
-                      } else {
-                        n_label_dict[i][groupLabel] = [gene.uid];
-                      }
-                    }
-                  }
+              if (tierLabel && tierLabel.trim()) {
+                if (tierLabel in n_label_dict[i]) {
+                  n_label_dict[i][tierLabel].push(existingAccessionsLookup[accession].uid);
+                } else {
+                  n_label_dict[i][tierLabel] = [existingAccessionsLookup[accession].uid];
                 }
               }
             }
@@ -763,23 +798,23 @@ function plot(data) {
 
         // Done extracting the specific label file data for the genes in the plot
 
-        // Build the default (homology) label and colour maps
+        // Build the default (PID homology) label and colour maps for each tier
         let n_uid_fn = [];
         let n_default_colour_map = [];
         let n_default_labels = [];
         let n_default_group_order = [];
 
-        for (let i=0; i < class_names.length; i++) {
+        for (let i=0; i < tierNames.length; i++) {
           let uid_fn = {};
           let default_colour_map = {};
           let default_labels = {};
           let default_group_order = [];
 
           for (group of data.groups) {
-            // Preserve the order of the groups in the label file
+            // Preserve the order of the groups in the label file (so that re-colouring doesn't shuffle the legend)
             default_group_order.push(group.label);
 
-            // Get the UIDs for each gene in the group
+            // Get UIDs for each gene in the group
             for (geneUID of group.genes) {
               if (group.label in uid_fn) {
                 uid_fn[group.label].push(geneUID);
@@ -789,14 +824,14 @@ function plot(data) {
             }
 
             let strippedColour = null;
-            if (group.colour != null && group.colour.length > 3) { // Check if the colour is rgb
+            if (group.colour && group.colour.length > 3) { // Check if the colour is RGB
               if (group.colour.includes("rgb(")) {
                 strippedColour = group.colour;
                 default_colour_map[group.label] = [strippedColour];
               }
             }
 
-            if (strippedColour == null || strippedColour == "") { // If the colour isn't rgb, check if it's a hex colour
+            if (!strippedColour || !strippedColour.trim()) { // If colour isn't RGB, check if it's a hex colour
               strippedColour = "#" + group.colour.replace(/[^0-9a-fA-F]/g, "");
               if (strippedColour != "#" && strippedColour != null && strippedColour != " ") {
                 default_colour_map[group.label] = [strippedColour];
@@ -807,6 +842,8 @@ function plot(data) {
 
             default_labels[group.label] = group.label;
           }
+          
+          // Push the column data to the n storage arrays
           n_uid_fn.push(uid_fn);
           n_default_colour_map.push(default_colour_map);
           n_default_labels.push(default_labels);
@@ -814,7 +851,7 @@ function plot(data) {
         }
 
         // Now we have all the data we need to build the new groups (homology extended and non-homologous subclass)
-        // 1 - If a gene from the label file is in a homology group, re-name the homology group to the label (e.g., Group 3 --> "Abi2 (dynamic homologous)")
+        // 1 - If a gene from the label file is in a homology group, rename the homology group to the label (e.g., Group 3 --> "Abi2 (dynamic homologous)")
         // 2 - If another gene with a different label from the label file is in the same homology group, prepend it to the label (e.g., Abi2 (dynamic homologous) --> Abi3 | Abi2 (dynamic homologous))
         // 3 - If a gene from the label file isn't in a homology group, create a new group for it in the fn and colour it black
         //   - If the label is already in the fn, add the gene to it (e.g., if 3 already happened)
@@ -851,6 +888,7 @@ function plot(data) {
               labelUIDs.push(uid);
             }
           }
+
           let groupUIDs = [];
           for (let groupLabel in defaultFN) {
             for (let uid of defaultFN[groupLabel]) {
@@ -868,7 +906,7 @@ function plot(data) {
 
             if (names[group] == group) {
               // Group name hasn't been updated, overwrite it
-              names[group] = label + " (Dynamic Homologous " + group.split(": ")[0] + ")";
+              names[group] = label + "(Dynamic Homologous " + group.split(": ")[0] + ")";
             } else {
               // Group name has been updated, check if it has the label already
               if (!(names[group].includes(label + " (Dynamic Homologous ") || names[group].includes(label + " | "))) {
@@ -878,12 +916,12 @@ function plot(data) {
             }
           }
 
-          let remove = []; // List of entries to remove from fn (renamed)
+          let remove = []; // List of entries to remove from fn (those that were renamed)
 
           // Update colour map with new labels
           for (let group of keys) {
             if (names[group] == group) {
-              // Group name not updated, colour it grey
+              // Group name is not updated, colour it grey
               colourMap[group] = ["#808080"];
             } else {
               defaultFN[names[group]] = defaultFN[group];
@@ -902,7 +940,7 @@ function plot(data) {
           // Add the rest of the label genes to the fn
           for (uid of labelRest) {
             label = uid_to_labels[uid] + " (Dynamic)";
-            
+
             if (label in defaultFN) {
               // New group already in fn, add the uid to it
               defaultFN[label].push(uid);
@@ -931,21 +969,19 @@ function plot(data) {
             let labeledGroup = false; // Flag to disable GroupNum toggling
             if (groupLabel in names) {
               if (names[groupLabel] != groupLabel || names[groupLabel].includes("Homologous")) {
-                // Group name updated, set labeledGroup to true
-                labeledGroup = true;
+                labeledGroup = true; // Group name updated
               }
-              groupLabel = names[groupLabel];
+              groupLabel = names[groupLabel]
             } else {
-              // New label group
-              labeledGroup = true;
+              labeledGroup = true; // New labeled group
             }
-
+            
             if (groupLabel in colourMap && colourMap[groupLabel].length > 1) {
               // If the group label has more than one colour, set it to the first one
               alert("Warning: Group label " + groupLabel + " has multiple colours assigned to it. Using the first one in the label file.");
             } else if (!(groupLabel in colourMap)) {
               alert(groupLabel + " not in colour map");
-              colourMap[groupLabel] = ["#808080"]
+              colourMap[groupLabel] = ["#808080"];
             }
 
             colourMap[groupLabel] = colourMap[groupLabel][0];
@@ -958,18 +994,23 @@ function plot(data) {
               "colour": colourMap[groupLabel],
               "labeled": labeledGroup,
               "baseLabel": groupLabel.split(": ")[0].trim()
-            }
+            };
 
             // Add the group to the groups array
             groups.push(newGroup);
           }
-      
-          data.classes.push({"name": class_names[i], "groups": groups}); // Add the new classes to the data object
+
+          data.classes.push({"name": tierNames[i], "groups": groups}); // Add the new classes to the data object
         }
 
+
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
         // Assign the labels to the genes
-        let matchDict = accessions;
-        let newFlag = isNew
+        let matchDict = dynamicAccessions;
+        // let newFlag = isNew
 
         let classDicts = [];
 
@@ -988,21 +1029,19 @@ function plot(data) {
 
         // Build the new dynamic label names
         let labelNames = [];
-        if (newFlag) {
-          for (let i=0; i<classDicts.length; i++) {
-            let labelName = class_names[i];
-            labelName = labelName.replace("Dynamic_", "");
-            labelName += "_(dynamic_custom_" + i + ")";
-            labelNames.push(labelName);
-          }
+        for (let i=0; i<classDicts.length; i++) {
+          let labelName = tierNames[i];
+          labelName = labelName.replace("Dynamic_", "");
+          labelName += "_(dynamic_custom_" + i + ")";
+          labelNames.push(labelName);
+        }
 
-          // Add the new label names to the dropdown
-          for (let name of labelNames) {
-            let newLabel = document.createElement("option");
-            newLabel.setAttribute("value", name);
-            newLabel.textContent = name.replaceAll("_", " ");
-            document.getElementById("select-label-type").appendChild(newLabel);
-          }
+        // Add the new label names to the dropdown
+        for (let name of labelNames) {
+          let newLabel = document.createElement("option");
+          newLabel.setAttribute("value", name);
+          newLabel.textContent = name.replaceAll("_", " ");
+          document.getElementById("select-label-type").appendChild(newLabel);
         }
 
         for (cluster of data.clusters) {
@@ -1011,14 +1050,12 @@ function plot(data) {
               let flag = false;
               let geneUID = gene.uid;
 
-              if (newFlag) {
-                // Label file is in the new format, add text class labels
-                for (let i=0; i<classDicts.length; i++) {
-                  if (geneUID in classDicts[i]) {
-                    gene.names[labelNames[i]] = classDicts[i][geneUID];
-                  } else {
-                    gene.names[labelNames[i]] = "";
-                  }
+              // Label file is in the new format, add text class labels
+              for (let i=0; i<classDicts.length; i++) {
+                if (geneUID in classDicts[i]) {
+                  gene.names[labelNames[i]] = classDicts[i][geneUID];
+                } else {
+                  gene.names[labelNames[i]] = "";
                 }
               }
 
@@ -1039,9 +1076,9 @@ function plot(data) {
           }
         }
 
-      // Add the new class labels to the dropdown
-        for (let i = 0; i < class_names.length; i++) {
-          let newClassName = class_names[i];
+        // Add the new class labels to the dropdown
+        for (let i = 0; i < tierNames.length; i++) {
+          let newClassName = tierNames[i];
           let newOption = document.createElement("option");
           newOption.setAttribute("value", newClassName);
           newOption.textContent = newClassName;
