@@ -43,6 +43,8 @@ def fig_to_svg(fig, width_pct='45'):
 
     svg = re.sub(r'^<svg', '<svg style="max-width: 100%; height: auto;"', svg, count=1)
 
+    plt.close(fig)
+
     return f"<div class='hover-div' style='width: {width_pct}%; cursor: pointer;' onclick='downloadSVG(this)'>{svg}</div>"
 
 def side_by_side(*figs):
@@ -279,7 +281,7 @@ def percent_labelled_pie(query_data):
     labels, sizes, colours = zip(*filtered)
 
     fig, ax = plt.subplots()
-    ax.pie(sizes, labels=labels, colors=colours, autopct='%.0f%%', startangle=140)
+    ax.pie(sizes, labels=labels, colors=colours, autopct='%.0f%%', startangle=140, pctdistance=0.75, wedgeprops=dict(width=0.5))
 
     ax.set_title("Percentage (%) of Genes Annotated")
 
@@ -292,15 +294,15 @@ def bar_chart(label_counts, title):
     :param title: Title of the bar chart
     return: SVG string for the bar chart
     """
-    fig, ax = plt.subplots(figsize=(8, 4))
-    
     labels, values = zip(*label_counts.items())
 
-    # trim_tag_labels = []
-    # for label in labels:
-    #     level = label.split("_")[-1]
-    #     label = "_".join(label.split("_")[:-1])
-    #     trim_tag_labels.append(label)
+    if len(labels) > 16:
+        width = 16
+    else:
+        width = 8
+
+    height = len(labels) * 0.4
+    fig, ax = plt.subplots(figsize=(width, max(4, height)))
 
     ax.barh(labels[::-1], values[::-1], color='#105938')
     ax.set_title(title)
@@ -309,7 +311,7 @@ def bar_chart(label_counts, title):
 
     return fig_to_svg(fig)
 
-def co_localized_heatmap(data, title, max_n=None, is_int=True, axis_tag=""):
+def co_localized_heatmap(data, title, max_n=None, is_int=True, axis_tag="", cell_size=0.3):
     """
     Generate a heatmap showing label-label or label-product co-localization numbers.
     :param data: A dict or nested dict containing the co-localization data.
@@ -317,6 +319,7 @@ def co_localized_heatmap(data, title, max_n=None, is_int=True, axis_tag=""):
     :param max_n: For label-product co-localization, max number of products to keep for each label (the most frequent n).
     :param is_int: True for raw counts, False for Log10 counts
     :param axis_tag: str to prepend to axis labels (e.g., "Tier 1" or "PSI-BLAST")
+    :cell size: 
     return: SVG heatmap str
     """
     # Check if data is one or two layers
@@ -356,8 +359,11 @@ def co_localized_heatmap(data, title, max_n=None, is_int=True, axis_tag=""):
             for product, count in product_counts.items():
                 matrix.loc[label, product] = count
 
-        width = max(10, 0.5 * len(all_products))
-        height = max(8, 0.4 * len(all_labels))
+        # width = max(10, 0.5 * len(all_products))
+        # height = max(8, 0.4 * len(all_labels))
+        width = max(10, cell_size * len(all_products) + 5)
+        height = max(8, cell_size * len(all_labels) + 4)
+
         xlabel = "NCBI Gene Annotations"
         ylabel = f"{axis_tag} Gene Annotations"
         bar_label = "Number of Co-Occurrences"
@@ -409,8 +415,10 @@ def co_localized_heatmap(data, title, max_n=None, is_int=True, axis_tag=""):
         # Reorder columns and rows
         # matrix = matrix.reindex(index=sorted(matrix.index, reverse=True), columns=sorted(matrix.columns))
 
-        width = max(10, len(matrix.columns) * .5)
-        height = max(8, len(matrix.index) * 0.4)
+        # width = max(10, len(matrix.columns) * .5)
+        # height = max(8, len(matrix.index) * 0.4)
+        width = max(10, len(matrix.columns) * cell_size + 5)
+        height = max(8, len(matrix.index) * cell_size + 4)
 
         ylabel = xlabel = f"{axis_tag} Gene Annotations"
         bar_label = "Number of Co-Occurrences"
@@ -419,12 +427,19 @@ def co_localized_heatmap(data, title, max_n=None, is_int=True, axis_tag=""):
         else:
             bar_label += " (Log\u2081\u2080 Scale)"
 
+    char_cutoff = 25
+    trunc_index = [i[:(char_cutoff-3)] + '...' if len(i) > char_cutoff else i for i in matrix.index]
+    trunc_columns = [i[:(char_cutoff-3)] + '...' if len(i) > char_cutoff else i for i in matrix.columns]
+
     fig, ax = plt.subplots(figsize=(width, height))
     sns.heatmap(matrix, cmap='Greens', annot=False, ax=ax, cbar_kws={'label': bar_label}, square=True)
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    plt.yticks(rotation=0)
+
+    ax.set_xticklabels(trunc_columns, rotation=45, ha='right')
+    ax.set_yticklabels(trunc_index, rotation=0)
+
     return fig_to_svg(fig)
 
 def sunburst_plot(label_products, title, is_psiblast=False, equal_wedges=False):
