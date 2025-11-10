@@ -87,7 +87,17 @@ for rep_tuple in rep_tuples:
 
     # Rename representative to contain number represented
     new_rep_name = rep.split("_")
-    new_rep_name.insert(-2, str(num_removed))
+
+    acc_no_vers = new_rep_name[-2][:-2]
+    potential_prefix = new_rep_name[-3]
+
+    if acc_no_vers.isdigit() and len(potential_prefix) == 2 and potential_prefix.isalpha() and potential_prefix.isupper():
+        # Accession is like WP_#######.#
+        new_rep_name = new_rep_name[:-3] + [str(num_removed)] + new_rep_name[-3:]
+    else:
+        # Doesn't match the refseq fmt, accession isn't '_' delimited
+        new_rep_name = new_rep_name[:-2] + [str(num_removed)] + new_rep_name[-2:]
+
     new_rep_name = "_".join(new_rep_name)
 
     move(path.join(args.gn_dir, rep), path.join(args.gn_dir, new_rep_name))
