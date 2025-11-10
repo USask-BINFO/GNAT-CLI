@@ -140,13 +140,24 @@ for (let c in data.clusters) {
     const cluster = data.clusters[c];
     const clusterName = cluster.name.split("_");
     const eValue = clusterName[clusterName.length - 1]; // E value of psi-blast match
-    const matchAccession = clusterName[clusterName.length - 2]; // Accession number of psi-blast match
+    let matchAccession = clusterName[clusterName.length - 2]; // Accession number of psi-blast match
+
+    // Check if the Accession is a '_' delimited accession like WP_#########.#
+    const potentialPrefix = clusterName[clusterName.length - 3];
+    if (/^\d+$/.test(matchAccession.slice(0,-2)) && potentialPrefix.length === 2 && /^[A-Z]{2}$/.test(potentialPrefix)) {
+      // Accession is in AZ_#######.# fmt
+      matchAccession = potentialPrefix + "_" + matchAccession;
+      dupeIdx = 4;
+    } else {
+      dupeIdx = 3;
+    }
+
     let newName = "";
 
     for (let n in clusterName) {
-      if (n < clusterName.length - 3) {
+      if (n < clusterName.length - dupeIdx) {
         newName += clusterName[n] + " ";
-      } else if (n == clusterName.length - 3) {
+      } else if (n == clusterName.length - dupeIdx) {
         if (clusterName[n] == 1) {
           newName += "(" + clusterName[n] + " duplicate)"
         } else {
