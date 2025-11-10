@@ -37,6 +37,13 @@ within = []
 for file in listdir(file_dir):
     if '.gb' in file[-3:]:
         acc = file.split("_")[-2]
+
+        potential_prefix = file.split("_")[-3]
+
+        # Check if acc is '_' delimited like WP_#########.#
+        if acc[:-2].isdigit() and len(potential_prefix) == 2 and potential_prefix.isalpha() and potential_prefix.isupper():
+            acc = "_".join([potential_prefix] + [acc])
+
         if gn_pid[acc] < args.t:
             within.append(file)
         else:
@@ -49,6 +56,7 @@ if len(within) > 0:
     mkdir(within_dir)
     for file in within:
         move(path.join(file_dir, file), path.join(within_dir, file))
+
 if len(outside) > 0:
     mkdir(outside_dir)
     for file in outside:
