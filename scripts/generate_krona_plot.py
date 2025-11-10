@@ -124,6 +124,12 @@ if args.gb_dir:
     for filename in filename_generator:
         accession = filename.strip().split("_")[-2]
 
+        # Check if the chars before the accession are part of the accession (e.g., WP_). Only possibilities should be the protein RefSeq accessions (.P_). There are several exceptions, just checking for upper case alpha
+        potential_prefix = filename.strip().split("_")[-3]
+        if len(potential_prefix) == 2 and potential_prefix.isalpha() and potential_prefix.isupper():
+            # Valid RefSeq prefix
+            accession = potential_prefix + "_" + accession
+
         match = accession_map.get(accession)
 
         if match:
