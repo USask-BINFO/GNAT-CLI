@@ -17,11 +17,6 @@ git pull
 ```
 
 Then add the scripts/ folder to your PATH, if you don't want to specify the location every time you call main.sh. 
-You can add the scripts to your PATH on unix systems with the following command (assuming you git cloned into your home directory):
-
-```
-export PATH="~/acrvis/scripts:$PATH"
-```
 
 ## Database
 
