@@ -1,4 +1,4 @@
-# AcrVis
+# GNAT-CLI
 
 Generalizable tool used to visualize the genomic neighbourhoods of Acr/Aca proteins and their taxonomic data.
 
@@ -7,7 +7,7 @@ Generalizable tool used to visualize the genomic neighbourhoods of Acr/Aca prote
 To install the neccessary scripts needed to run the pipeline, simply run the following command in the directory you wish to have the project installed:
 
 ```
-git clone https://git.cs.usask.ca/njt694/acrvis.git
+git clone https://github.com/USask-BINFO/GNAT-CLI
 ```
 
 If you wish to install any updates to the pipeline, cd to the directory created by the git clone and run:
